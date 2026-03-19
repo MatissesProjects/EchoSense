@@ -2,7 +2,8 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="#121212">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -13,9 +14,42 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="EchoSense Control Panel"
+            android:text="EchoSense Intelligence"
             android:textSize="24sp"
             android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Control Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <Button
+                android:id="@+id/btnToggleEngine"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Stop Engine"
+                android:layout_marginEnd="8dp" />
+
+            <Button
+                android:id="@+id/btnAutoTune"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Auto-Tune"
+                android:backgroundTint="#FF9800" />
+        </LinearLayout>
+
+        <!-- Frequency Visualizer -->
+        <com.echosense.app.FrequencyVisualizerView
+            android:id="@+id/visualizerView"
+            android:layout_width="match_parent"
+            android:layout_height="180dp"
+            android:background="#1E1E1E"
             android:layout_marginBottom="16dp" />
 
         <!-- Input Meter -->
@@ -23,37 +57,39 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Input Level"
-            android:textStyle="bold"
+            android:textColor="#BBBBBB"
             android:layout_marginBottom="4dp" />
         <ProgressBar
             android:id="@+id/progressBarVolume"
             style="@android:style/Widget.ProgressBar.Horizontal"
             android:layout_width="match_parent"
-            android:layout_height="12dp"
+            android:layout_height="8dp"
             android:max="100"
             android:progress="0"
             android:progressTint="#4CAF50"
-            android:layout_marginBottom="24dp" />
+            android:layout_marginBottom="16dp" />
 
         <!-- Master Gain -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Master Gain Boost"
+            android:textColor="#FFFFFF"
             android:textStyle="bold" />
         <SeekBar
             android:id="@+id/seekBarMasterGain"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:max="200"
-            android:progress="10"
+            android:progress="4"
             android:layout_marginBottom="16dp" />
 
         <!-- Noise Gate -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Noise Gate Threshold" />
+            android:text="Noise Gate Threshold"
+            android:textColor="#FFFFFF" />
         <SeekBar
             android:id="@+id/seekBarNoiseGate"
             android:layout_width="match_parent"
@@ -66,7 +102,8 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Band 1: Low (200Hz)" />
+            android:text="Band 1: Low (200Hz)"
+            android:textColor="#FFFFFF" />
         <SeekBar
             android:id="@+id/seekBarBand1"
             android:layout_width="match_parent"
@@ -78,7 +115,8 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Band 2: Low-Mid (500Hz)" />
+            android:text="Band 2: Low-Mid (500Hz)"
+            android:textColor="#FFFFFF" />
         <SeekBar
             android:id="@+id/seekBarBand2"
             android:layout_width="match_parent"
@@ -90,7 +128,8 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Band 3: Mid (1.5kHz)" />
+            android:text="Band 3: Mid (1.5kHz)"
+            android:textColor="#FFFFFF" />
         <SeekBar
             android:id="@+id/seekBarBand3"
             android:layout_width="match_parent"
@@ -102,7 +141,8 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Band 4: High-Mid (3kHz)" />
+            android:text="Band 4: High-Mid (3kHz)"
+            android:textColor="#FFFFFF" />
         <SeekBar
             android:id="@+id/seekBarBand4"
             android:layout_width="match_parent"
@@ -114,7 +154,8 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Band 5: High (6kHz)" />
+            android:text="Band 5: High (6kHz)"
+            android:textColor="#FFFFFF" />
         <SeekBar
             android:id="@+id/seekBarBand5"
             android:layout_width="match_parent"
@@ -122,14 +163,6 @@
             android:max="200"
             android:progress="100"
             android:layout_marginBottom="16dp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="* A fixed 150Hz High-Pass filter is active to reduce fan noise."
-            android:textSize="12sp"
-            android:layout_marginTop="16dp"
-            android:textColor="#888888" />
 
     </LinearLayout>
 </ScrollView>

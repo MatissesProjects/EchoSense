@@ -17,6 +17,9 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private val RECORD_AUDIO_PERMISSION_CODE = 1
+    
+    private val fftData = FloatArray(512)
+    private val eqCurveData = FloatArray(100)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,23 +32,36 @@ class MainActivity : AppCompatActivity() {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), RECORD_AUDIO_PERMISSION_CODE)
         } else {
             startAudioEngine()
-            startMetering()
+            startVisualizer()
         }
     }
 
     private fun setupUI() {
-        // Master Gain: Scale 0-200 to 0.0-50.0 (progress / 4.0)
-        binding.seekBarMasterGain.max = 200
-        binding.seekBarMasterGain.progress = 4 // Default to 1.0x
+        binding.btnToggleEngine.setOnClickListener {
+            if (isAudioEngineRunning()) {
+                stopAudioEngine()
+                binding.btnToggleEngine.text = "Start Engine"
+            } else {
+                startAudioEngine()
+                binding.btnToggleEngine.text = "Stop Engine"
+            }
+        }
+
+        binding.btnAutoTune.setOnClickListener {
+            autoTune()
+            // The C++ engine updates its gains, but we need to update the UI sliders to match
+            // For a POC, we'll just show a toast, but in a real app we'd query the new gains
+            Toast.makeText(this, "Intelligent Filtering Applied", Toast.LENGTH_SHORT).show()
+        }
+
         binding.seekBarMasterGain.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                setMasterGain(progress / 4.0f)
+                setMasterGain(progress / 10.0f)
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
 
-        // Noise Gate: Scale 0-100 to 0.0-0.5 threshold
         binding.seekBarNoiseGate.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 setNoiseGateThreshold(progress / 200.0f)
@@ -54,7 +70,6 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
 
-        // EQ Bands (Bands 1-5): Scale 0-200 to -12dB to +12dB (100 is 0dB)
         val eqSeekBars = listOf(
             binding.seekBarBand1,
             binding.seekBarBand2,
@@ -65,10 +80,9 @@ class MainActivity : AppCompatActivity() {
 
         eqSeekBars.forEachIndexed { index, seekBar ->
             seekBar.max = 200
-            seekBar.progress = 100 // 0dB
+            seekBar.progress = 100
             seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                    // Map 0-200 to -12.0 to +12.0 dB
                     val gainDb = (progress - 100) * 0.12f
                     setEqualizerBandGain(index, gainDb)
                 }
@@ -78,13 +92,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun startMetering() {
+    private fun startVisualizer() {
         lifecycleScope.launch {
             while (true) {
-                val volume = getVolumeLevel()
-                val progress = (volume * 500).toInt().coerceIn(0, 100)
-                binding.progressBarVolume.progress = progress
-                delay(33)
+                if (isAudioEngineRunning()) {
+                    // Update Meter
+                    val volume = getVolumeLevel()
+                    val progress = (volume * 500).toInt().coerceIn(0, 100)
+                    binding.progressBarVolume.progress = progress
+
+                    // Update Spectrum & EQ Curve
+                    getFftData(fftData)
+                    getEqCurveData(eqCurveData)
+                    binding.visualizerView.updateData(fftData, eqCurveData)
+                }
+                delay(33) // ~30 FPS
             }
         }
     }
@@ -94,9 +116,9 @@ class MainActivity : AppCompatActivity() {
         if (requestCode == RECORD_AUDIO_PERMISSION_CODE) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startAudioEngine()
-                startMetering()
+                startVisualizer()
             } else {
-                Toast.makeText(this, "Permission denied. Audio cannot be recorded.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Permission denied.", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -108,10 +130,14 @@ class MainActivity : AppCompatActivity() {
 
     external fun startAudioEngine()
     external fun stopAudioEngine()
+    external fun isAudioEngineRunning(): Boolean
     external fun setNoiseGateThreshold(threshold: Float)
     external fun setMasterGain(gain: Float)
     external fun setEqualizerBandGain(bandIndex: Int, gain: Float)
     external fun getVolumeLevel(): Float
+    external fun getFftData(output: FloatArray)
+    external fun getEqCurveData(output: FloatArray)
+    external fun autoTune()
 
     companion object {
         init {

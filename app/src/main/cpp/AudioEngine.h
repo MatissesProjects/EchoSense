@@ -4,6 +4,8 @@
 #include <oboe/Oboe.h>
 #include <atomic>
 #include <cmath>
+#include <vector>
+#include <mutex>
 
 // Biquad Filter Structure (RBJ Cookbook)
 struct Biquad {
@@ -61,6 +63,18 @@ struct Biquad {
         a1 = a1_raw / a0_raw;
         a2 = a2_raw / a0_raw;
     }
+
+    // Get magnitude response at frequency f
+    float getMagnitude(float freq, float sampleRate) {
+        float omega = 2.0f * M_PI * freq / sampleRate;
+        float cos_w = cosf(omega);
+        float cos_2w = cosf(2.0f * omega);
+        
+        float num = b0*b0 + b1*b1 + b2*b2 + 2.0f*(b0*b1 + b1*b2)*cos_w + 2.0f*b0*b2*cos_2w;
+        float den = 1.0f + a1*a1 + a2*a2 + 2.0f*(a1 + a1*a2)*cos_w + 2.0f*a2*cos_2w;
+        
+        return sqrtf(num / den);
+    }
 };
 
 class AudioEngine : public oboe::AudioStreamDataCallback {
@@ -70,6 +84,7 @@ public:
 
     bool start();
     void stop();
+    bool isRunning() const { return mIsRunning.load(); }
 
     // Parameter updates
     void setNoiseGateThreshold(float threshold);
@@ -77,11 +92,17 @@ public:
     void setMasterGain(float gain);
     float getVolumeLevel() const { return mCurrentVolume.load(); }
 
+    // Visualization and Analysis
+    void getFftData(float* output, int size);
+    void getEqCurveData(float* output, int size);
+    void autoTune();
+
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) override;
 
 private:
     oboe::AudioStream *mRecordingStream = nullptr;
     oboe::AudioStream *mPlaybackStream = nullptr;
+    std::atomic<bool> mIsRunning{false};
     float mSampleRate = 48000.0f;
 
     // Parameters (atomic for thread safety)
@@ -92,13 +113,21 @@ private:
     std::atomic<bool> mParamsChanged{true};
 
     // DSP Components
-    Biquad mHighPass;      // Fixed Low-Cut (Fan removal)
+    Biquad mHighPass;      // Fixed Low-Cut
     Biquad mEQBands[5];    // 5-Band User EQ
+
+    // Spectrum Analysis
+    static const int FFT_SIZE = 1024;
+    std::vector<float> mFftBuffer;
+    std::vector<float> mFftOutput;
+    int mFftWritePos = 0;
+    std::mutex mFftMutex;
 
     // Internal processing
     void updateFilters();
     float processSample(float sample);
     void calculateVolume(const float* data, int numFrames);
+    void processFft(const float* data, int numFrames);
 };
 
 #endif //ECHOSENSE_AUDIOENGINE_H
