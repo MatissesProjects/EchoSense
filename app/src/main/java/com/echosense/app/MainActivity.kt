@@ -34,10 +34,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupUI() {
-        // Master Gain: Scale 0-200 to 0.0-20.0 (progress / 10.0)
+        // Master Gain: Scale 0-200 to 0.0-50.0 (progress / 4.0)
+        binding.seekBarMasterGain.max = 200
+        binding.seekBarMasterGain.progress = 4 // Default to 1.0x
         binding.seekBarMasterGain.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                setMasterGain(progress / 10.0f)
+                setMasterGain(progress / 4.0f)
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}

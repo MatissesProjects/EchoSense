@@ -22,6 +22,8 @@ bool AudioEngine::start() {
     builder.setDirection(oboe::Direction::Output);
     builder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
     builder.setSharingMode(oboe::SharingMode::Exclusive);
+    builder.setUsage(oboe::Usage::VoiceCommunication);
+    builder.setContentType(oboe::ContentType::Speech);
     builder.setFormat(oboe::AudioFormat::Float);
     builder.setChannelCount(1);
 
@@ -35,14 +37,23 @@ bool AudioEngine::start() {
 
     // --- 2. Setup Recording Stream ---
     builder.setDirection(oboe::Direction::Input);
+    builder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
+    builder.setSharingMode(oboe::SharingMode::Exclusive);
+    builder.setInputPreset(oboe::InputPreset::Unprocessed); // RAW audio, no system-level suppression
     builder.setDataCallback(this);
     builder.setSampleRate((int32_t)mSampleRate); // Match playback sample rate
+    builder.setChannelCount(1);
 
     result = builder.openStream(&mRecordingStream);
     if (result != oboe::Result::OK) {
         __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to open recording stream. Error: %s", oboe::convertToText(result));
-        mPlaybackStream->close();
-        return false;
+        // Try again without InputPreset::Unprocessed (fallback to VoiceRecognition)
+        builder.setInputPreset(oboe::InputPreset::VoiceRecognition);
+        result = builder.openStream(&mRecordingStream);
+        if (result != oboe::Result::OK) {
+            mPlaybackStream->close();
+            return false;
+        }
     }
 
     // Initialize High-Pass filter to cut fan rumble (150Hz)
@@ -142,7 +153,9 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
 
     // 3. Playback
     if (mPlaybackStream != nullptr) {
-        mPlaybackStream->write(floatData, numFrames, 0);
+        // Write processed data to the playback stream
+        // We use a small timeout to allow Oboe to handle small jitter
+        mPlaybackStream->write(floatData, numFrames, 1000000); // 1ms timeout
     }
 
     return oboe::DataCallbackResult::Continue;
