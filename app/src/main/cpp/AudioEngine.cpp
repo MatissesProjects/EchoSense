@@ -6,11 +6,7 @@
 #define TAG "AudioEngine"
 
 AudioEngine::AudioEngine() {
-    for (int i = 0; i < 5; ++i) {
-        mBandGains[i].store(0.0f);
-    }
-    mFftBuffer.resize(FFT_SIZE, 0.0f);
-    mFftOutput.resize(FFT_SIZE / 2, 0.0f);
+    for (int i = 0; i < 5; ++i) mBandGains[i].store(0.0f);
 }
 
 AudioEngine::~AudioEngine() {
@@ -20,6 +16,8 @@ AudioEngine::~AudioEngine() {
 bool AudioEngine::start() {
     if (mIsRunning.load()) return true;
     oboe::AudioStreamBuilder builder;
+
+    // 1. Playback Stream (The "Clock")
     builder.setDirection(oboe::Direction::Output);
     builder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
     builder.setSharingMode(oboe::SharingMode::Exclusive);
@@ -27,35 +25,45 @@ bool AudioEngine::start() {
     builder.setContentType(oboe::ContentType::Speech);
     builder.setFormat(oboe::AudioFormat::Float);
     builder.setChannelCount(1);
+    builder.setDataCallback(this);
 
     if (builder.openStream(&mPlaybackStream) != oboe::Result::OK) return false;
     mSampleRate = (float) mPlaybackStream->getSampleRate();
 
-    builder.setDirection(oboe::Direction::Input);
-    builder.setInputPreset(oboe::InputPreset::Unprocessed);
-    builder.setDataCallback(this);
-    builder.setSampleRate((int32_t)mSampleRate);
+    // 2. Recording Stream (Polled)
+    oboe::AudioStreamBuilder recBuilder;
+    recBuilder.setDirection(oboe::Direction::Input);
+    recBuilder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
+    recBuilder.setSharingMode(oboe::SharingMode::Exclusive);
+    recBuilder.setInputPreset(oboe::InputPreset::Unprocessed);
+    recBuilder.setDataCallback(nullptr);
+    recBuilder.setSampleRate((int32_t)mSampleRate);
+    recBuilder.setChannelCount(1);
+    recBuilder.setFormat(oboe::AudioFormat::Float);
 
-    if (builder.openStream(&mRecordingStream) != oboe::Result::OK) {
+    if (recBuilder.openStream(&mRecordingStream) != oboe::Result::OK) {
         mPlaybackStream->close();
         return false;
     }
 
     mHighPass.setHighPass(150.0f, mSampleRate, 0.707f);
     updateFilters();
-    mPlaybackStream->requestStart();
+
     mRecordingStream->requestStart();
+    mPlaybackStream->requestStart();
     mIsRunning.store(true);
     return true;
 }
 
 void AudioEngine::stop() {
     if (!mIsRunning.load()) return;
+    mIsRunning.store(false);
+    if (mRecordingStream) mRecordingStream->stop();
+    if (mPlaybackStream) mPlaybackStream->stop();
     if (mRecordingStream) mRecordingStream->close();
     if (mPlaybackStream) mPlaybackStream->close();
     mRecordingStream = nullptr;
     mPlaybackStream = nullptr;
-    mIsRunning.store(false);
 }
 
 void AudioEngine::setPreAmpGain(float gain) { mPreAmpGain.store(gain); }
@@ -71,71 +79,45 @@ void AudioEngine::setEqualizerBandGain(int bandIndex, float gainDb) {
 
 void AudioEngine::updateFilters() {
     float freqs[5] = {200.0f, 500.0f, 1500.0f, 3000.0f, 6000.0f};
-    for (int i = 0; i < 5; ++i) {
-        mEQBands[i].setPeaking(freqs[i], mSampleRate, 1.0f, mBandGains[i].load());
-    }
-    // Dedicated Voice Band-Pass (300Hz - 3.5kHz)
+    for (int i = 0; i < 5; ++i) mEQBands[i].setPeaking(freqs[i], mSampleRate, 1.0f, mBandGains[i].load());
     mVoiceFilters[0].setHighPass(300.0f, mSampleRate, 0.707f);
     mVoiceFilters[1].setLowPass(3500.0f, mSampleRate, 0.707f);
     mParamsChanged.store(false);
 }
 
-float AudioEngine::processSample(float sample) {
-    // 1. Pre-Amp (Sensitivity)
+inline float AudioEngine::processSample(float sample) {
     float out = sample * mPreAmpGain.load();
-
-    // 2. Noise Gate
     if (std::abs(out) < mNoiseGateThreshold.load()) return 0.0f;
-
-    // 3. Fixed High-Pass
     out = mHighPass.process(out);
-
-    // 4. Parallel Voice Boost Path
+    
     float voicePath = out;
     voicePath = mVoiceFilters[0].process(voicePath);
     voicePath = mVoiceFilters[1].process(voicePath);
     float voiceGain = powf(10.0f, mVoiceBoostDb.load() / 20.0f);
     
-    // 5. EQ Path
     float eqPath = out;
-    for (int i = 0; i < 5; ++i) {
-        eqPath = mEQBands[i].process(eqPath);
-    }
-
-    // 6. Combine Paths
+    for (int i = 0; i < 5; ++i) eqPath = mEQBands[i].process(eqPath);
+    
     out = eqPath + (voicePath * voiceGain);
-
-    // 7. Master Gain & Limiter
     out *= mMasterGain.load();
     return std::clamp(out, -1.0f, 1.0f);
 }
 
-void AudioEngine::calculateVolume(const float* data, int numFrames) {
+void AudioEngine::updateVisualization(const float* data, int numFrames) {
+    std::lock_guard<std::mutex> lock(mVisMutex);
     float sumSq = 0;
     for (int i = 0; i < numFrames; ++i) sumSq += data[i] * data[i];
-    mCurrentVolume.store(std::sqrt(sumSq / numFrames));
-}
+    float rms = sqrtf(sumSq / (float)numFrames);
+    mCurrentVolume.store(rms);
 
-void AudioEngine::processFft(const float* data, int numFrames) {
-    std::lock_guard<std::mutex> lock(mFftMutex);
-    for (int i = 0; i < numFrames; ++i) {
-        mFftBuffer[mFftWritePos] = data[i];
-        mFftWritePos = (mFftWritePos + 1) % FFT_SIZE;
-    }
-    if (mFftWritePos % 512 == 0) {
-        for (int i = 0; i < (int)mFftOutput.size(); ++i) {
-            float sum = 0;
-            for(int j=0; j<FFT_SIZE; j++) {
-                sum += mFftBuffer[j] * sinf(2.0f * M_PI * (float)i * (float)j / (float)FFT_SIZE);
-            }
-            mFftOutput[i] = std::abs(sum) / (FFT_SIZE / 2);
-        }
-    }
+    for(int i = VIS_BINS-1; i > 0; --i) mVisData[i] = mVisData[i-1];
+    mVisData[0] = rms;
 }
 
 void AudioEngine::getFftData(float* output, int size) {
-    std::lock_guard<std::mutex> lock(mFftMutex);
-    std::copy(mFftOutput.begin(), mFftOutput.begin() + std::min((int)mFftOutput.size(), size), output);
+    std::lock_guard<std::mutex> lock(mVisMutex);
+    int copySize = std::min(VIS_BINS, size);
+    std::copy(mVisData, mVisData + copySize, output);
 }
 
 void AudioEngine::getEqCurveData(float* output, int size) {
@@ -144,12 +126,7 @@ void AudioEngine::getEqCurveData(float* output, int size) {
         float freq = 20.0f * powf(1000.0f, (float)i / (float)size);
         float eqMag = mHighPass.getMagnitude(freq, mSampleRate);
         for (int b = 0; b < 5; ++b) eqMag *= mEQBands[b].getMagnitude(freq, mSampleRate);
-        
-        float vMag = mHighPass.getMagnitude(freq, mSampleRate);
-        vMag *= mVoiceFilters[0].getMagnitude(freq, mSampleRate);
-        vMag *= mVoiceFilters[1].getMagnitude(freq, mSampleRate);
-        vMag *= voiceGain;
-        
+        float vMag = mHighPass.getMagnitude(freq, mSampleRate) * mVoiceFilters[0].getMagnitude(freq, mSampleRate) * mVoiceFilters[1].getMagnitude(freq, mSampleRate) * voiceGain;
         output[i] = eqMag + vMag;
     }
 }
@@ -164,11 +141,22 @@ void AudioEngine::autoTune() {
 }
 
 oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
-    float *floatData = static_cast<float *>(audioData);
+    float *outputBuffer = static_cast<float *>(audioData);
+    
     if (mParamsChanged.load()) updateFilters();
-    for (int i = 0; i < numFrames; ++i) floatData[i] = processSample(floatData[i]);
-    calculateVolume(floatData, numFrames);
-    processFft(floatData, numFrames);
-    if (mPlaybackStream) mPlaybackStream->write(floatData, numFrames, 1000000);
+
+    auto result = mRecordingStream->read(outputBuffer, numFrames, 0);
+    int32_t framesRead = result.value();
+
+    if (framesRead < numFrames) {
+        for (int i = framesRead; i < numFrames; ++i) outputBuffer[i] = 0.0f;
+    }
+
+    for (int i = 0; i < numFrames; ++i) {
+        outputBuffer[i] = processSample(outputBuffer[i]);
+    }
+
+    updateVisualization(outputBuffer, numFrames);
+
     return oboe::DataCallbackResult::Continue;
 }
