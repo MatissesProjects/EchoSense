@@ -34,3 +34,11 @@ Java_com_echosense_app_MainActivity_setEqualizerBandGain(JNIEnv *env, jobject /*
         audioEngine->setEqualizerBandGain(bandIndex, gain);
     }
 }
+
+extern "C" JNIEXPORT jfloat JNICALL
+Java_com_echosense_app_MainActivity_getVolumeLevel(JNIEnv *env, jobject /* this */) {
+    if (audioEngine != nullptr) {
+        return (jfloat) audioEngine->getVolumeLevel();
+    }
+    return 0.0f;
+}

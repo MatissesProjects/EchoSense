@@ -16,6 +16,23 @@
             android:text="EchoSense Control Panel"
             android:textSize="24sp"
             android:textStyle="bold"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Input Meter -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Input Level"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+        <ProgressBar
+            android:id="@+id/progressBarVolume"
+            style="@android:style/Widget.ProgressBar.Horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="12dp"
+            android:max="100"
+            android:progress="0"
+            android:progressTint="#4CAF50"
             android:layout_marginBottom="24dp" />
 
         <!-- Noise Gate -->
@@ -35,7 +52,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Band 1: Low (100Hz)" />
+            android:text="Band 1: Master Gain" />
         <SeekBar
             android:id="@+id/seekBarBand1"
             android:layout_width="match_parent"

@@ -8,7 +8,10 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.echosense.app.databinding.ActivityMainBinding
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
@@ -26,6 +29,7 @@ class MainActivity : AppCompatActivity() {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), RECORD_AUDIO_PERMISSION_CODE)
         } else {
             startAudioEngine()
+            startMetering()
         }
     }
 
@@ -59,11 +63,25 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun startMetering() {
+        lifecycleScope.launch {
+            while (true) {
+                val volume = getVolumeLevel()
+                // Map volume (0.0 to 1.0) to 0-100 progress
+                // Multiplied by 500 for better visibility of low levels
+                val progress = (volume * 500).toInt().coerceIn(0, 100)
+                binding.progressBarVolume.progress = progress
+                delay(33) // ~30 FPS
+            }
+        }
+    }
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == RECORD_AUDIO_PERMISSION_CODE) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startAudioEngine()
+                startMetering()
             } else {
                 Toast.makeText(this, "Permission denied. Audio cannot be recorded.", Toast.LENGTH_SHORT).show()
             }
@@ -79,6 +97,7 @@ class MainActivity : AppCompatActivity() {
     external fun stopAudioEngine()
     external fun setNoiseGateThreshold(threshold: Float)
     external fun setEqualizerBandGain(bandIndex: Int, gain: Float)
+    external fun getVolumeLevel(): Float
 
     companion object {
         init {

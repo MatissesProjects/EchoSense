@@ -15,18 +15,22 @@ public:
     // Parameter updates
     void setNoiseGateThreshold(float threshold);
     void setEqualizerBandGain(int bandIndex, float gain);
+    float getVolumeLevel() const { return mCurrentVolume.load(); }
 
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) override;
 
 private:
-    oboe::AudioStream *mStream = nullptr;
+    oboe::AudioStream *mRecordingStream = nullptr;
+    oboe::AudioStream *mPlaybackStream = nullptr;
     
-    // Parameters (atomic for thread safety between UI and Audio threads)
+    // Parameters (atomic for thread safety)
     std::atomic<float> mNoiseGateThreshold{0.0f};
     std::atomic<float> mBandGains[5];
+    std::atomic<float> mCurrentVolume{0.0f};
 
     // Internal processing
     float processSample(float sample);
+    void calculateVolume(const float* data, int numFrames);
 };
 
 #endif //ECHOSENSE_AUDIOENGINE_H
