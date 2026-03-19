@@ -49,10 +49,26 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnAutoTune.setOnClickListener {
             autoTune()
-            // The C++ engine updates its gains, but we need to update the UI sliders to match
-            // For a POC, we'll just show a toast, but in a real app we'd query the new gains
-            Toast.makeText(this, "Intelligent Filtering Applied", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "AI Auto-Tune Applied", Toast.LENGTH_SHORT).show()
         }
+
+        binding.seekBarPreAmp.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                // Scale 0-100 to 0.0-10.0 (progress / 10.0)
+                setPreAmpGain(progress / 10.0f)
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        binding.seekBarVoiceBoost.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                // Scale 0-100 to 0.0-20.0 dB (progress / 5.0)
+                setVoiceBoost(progress / 5.0f)
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
 
         binding.seekBarMasterGain.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
@@ -96,17 +112,15 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             while (true) {
                 if (isAudioEngineRunning()) {
-                    // Update Meter
                     val volume = getVolumeLevel()
                     val progress = (volume * 500).toInt().coerceIn(0, 100)
                     binding.progressBarVolume.progress = progress
 
-                    // Update Spectrum & EQ Curve
                     getFftData(fftData)
                     getEqCurveData(eqCurveData)
                     binding.visualizerView.updateData(fftData, eqCurveData)
                 }
-                delay(33) // ~30 FPS
+                delay(33)
             }
         }
     }
@@ -117,8 +131,6 @@ class MainActivity : AppCompatActivity() {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startAudioEngine()
                 startVisualizer()
-            } else {
-                Toast.makeText(this, "Permission denied.", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -131,6 +143,8 @@ class MainActivity : AppCompatActivity() {
     external fun startAudioEngine()
     external fun stopAudioEngine()
     external fun isAudioEngineRunning(): Boolean
+    external fun setPreAmpGain(gain: Float)
+    external fun setVoiceBoost(gainDb: Float)
     external fun setNoiseGateThreshold(threshold: Float)
     external fun setMasterGain(gain: Float)
     external fun setEqualizerBandGain(bandIndex: Int, gain: Float)

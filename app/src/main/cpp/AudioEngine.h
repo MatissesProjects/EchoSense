@@ -64,16 +64,33 @@ struct Biquad {
         a2 = a2_raw / a0_raw;
     }
 
-    // Get magnitude response at frequency f
+    void setLowPass(float freq, float sampleRate, float Q) {
+        float omega = 2.0f * M_PI * freq / sampleRate;
+        float sn = sinf(omega);
+        float cs = cosf(omega);
+        float alpha = sn / (2.0f * Q);
+
+        float b0_raw = (1.0f - cs) / 2.0f;
+        float b1_raw = 1.0f - cs;
+        float b2_raw = (1.0f - cs) / 2.0f;
+        float a0_raw = 1.0f + alpha;
+        float a1_raw = -2.0f * cs;
+        float a2_raw = 1.0f - alpha;
+
+        b0 = b0_raw / a0_raw;
+        b1 = b1_raw / a0_raw;
+        b2 = b2_raw / a0_raw;
+        a1 = a1_raw / a0_raw;
+        a2 = a2_raw / a0_raw;
+    }
+
     float getMagnitude(float freq, float sampleRate) {
         float omega = 2.0f * M_PI * freq / sampleRate;
         float cos_w = cosf(omega);
         float cos_2w = cosf(2.0f * omega);
-        
         float num = b0*b0 + b1*b1 + b2*b2 + 2.0f*(b0*b1 + b1*b2)*cos_w + 2.0f*b0*b2*cos_2w;
         float den = 1.0f + a1*a1 + a2*a2 + 2.0f*(a1 + a1*a2)*cos_w + 2.0f*a2*cos_2w;
-        
-        return sqrtf(num / den);
+        return sqrtf(fmaxf(0.0f, num / den));
     }
 };
 
@@ -86,13 +103,13 @@ public:
     void stop();
     bool isRunning() const { return mIsRunning.load(); }
 
-    // Parameter updates
+    void setPreAmpGain(float gain);
+    void setVoiceBoost(float gainDb);
     void setNoiseGateThreshold(float threshold);
     void setEqualizerBandGain(int bandIndex, float gainDb);
     void setMasterGain(float gain);
     float getVolumeLevel() const { return mCurrentVolume.load(); }
 
-    // Visualization and Analysis
     void getFftData(float* output, int size);
     void getEqCurveData(float* output, int size);
     void autoTune();
@@ -105,25 +122,24 @@ private:
     std::atomic<bool> mIsRunning{false};
     float mSampleRate = 48000.0f;
 
-    // Parameters (atomic for thread safety)
+    std::atomic<float> mPreAmpGain{1.0f};
+    std::atomic<float> mVoiceBoostDb{0.0f};
     std::atomic<float> mNoiseGateThreshold{0.0f};
     std::atomic<float> mBandGains[5];
     std::atomic<float> mMasterGain{1.0f};
     std::atomic<float> mCurrentVolume{0.0f};
     std::atomic<bool> mParamsChanged{true};
 
-    // DSP Components
-    Biquad mHighPass;      // Fixed Low-Cut
-    Biquad mEQBands[5];    // 5-Band User EQ
+    Biquad mHighPass;
+    Biquad mEQBands[5];
+    Biquad mVoiceFilters[2]; // Low-cut and High-cut for voice band
 
-    // Spectrum Analysis
     static const int FFT_SIZE = 1024;
     std::vector<float> mFftBuffer;
     std::vector<float> mFftOutput;
     int mFftWritePos = 0;
     std::mutex mFftMutex;
 
-    // Internal processing
     void updateFilters();
     float processSample(float sample);
     void calculateVolume(const float* data, int numFrames);

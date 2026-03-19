@@ -20,7 +20,6 @@
             android:textColor="#FFFFFF"
             android:layout_marginBottom="16dp" />
 
-        <!-- Control Buttons -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -44,7 +43,6 @@
                 android:backgroundTint="#FF9800" />
         </LinearLayout>
 
-        <!-- Frequency Visualizer -->
         <com.echosense.app.FrequencyVisualizerView
             android:id="@+id/visualizerView"
             android:layout_width="match_parent"
@@ -52,7 +50,6 @@
             android:background="#1E1E1E"
             android:layout_marginBottom="16dp" />
 
-        <!-- Input Meter -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -69,11 +66,40 @@
             android:progressTint="#4CAF50"
             android:layout_marginBottom="16dp" />
 
-        <!-- Master Gain -->
+        <!-- New: Pre-Amp / Sensitivity -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Master Gain Boost"
+            android:text="Mic Sensitivity (Pre-Amp)"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold" />
+        <SeekBar
+            android:id="@+id/seekBarPreAmp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="10"
+            android:layout_marginBottom="16dp" />
+
+        <!-- New: Voice clarity -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Voice Clarity Boost"
+            android:textColor="#4FC3F7"
+            android:textStyle="bold" />
+        <SeekBar
+            android:id="@+id/seekBarVoiceBoost"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="0"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Master Output Gain"
             android:textColor="#FFFFFF"
             android:textStyle="bold" />
         <SeekBar
@@ -84,7 +110,6 @@
             android:progress="4"
             android:layout_marginBottom="16dp" />
 
-        <!-- Noise Gate -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -98,7 +123,6 @@
             android:progress="0"
             android:layout_marginBottom="16dp" />
 
-        <!-- EQ Bands -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

@@ -30,6 +30,20 @@ Java_com_echosense_app_MainActivity_isAudioEngineRunning(JNIEnv *env, jobject /*
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_echosense_app_MainActivity_setPreAmpGain(JNIEnv *env, jobject /* this */, jfloat gain) {
+    if (audioEngine != nullptr) {
+        audioEngine->setPreAmpGain(gain);
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_echosense_app_MainActivity_setVoiceBoost(JNIEnv *env, jobject /* this */, jfloat gainDb) {
+    if (audioEngine != nullptr) {
+        audioEngine->setVoiceBoost(gainDb);
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_echosense_app_MainActivity_setNoiseGateThreshold(JNIEnv *env, jobject /* this */, jfloat threshold) {
     if (audioEngine != nullptr) {
         audioEngine->setNoiseGateThreshold(threshold);
