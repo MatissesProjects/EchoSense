@@ -43,9 +43,20 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
 
-        // EQ Bands: Scale 0-200 to 0.0-2.0 gain (100 is 1.0)
+        // Band 1: Master Boost (0.0 to 10.0 range)
+        binding.seekBarBand1.max = 500 // 0 to 500 range
+        binding.seekBarBand1.progress = 50 // Default to 1.0 (50/5)
+        binding.seekBarBand1.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                // Scale 0-500 to 0.0-10.0 (progress / 50.0)
+                setEqualizerBandGain(0, progress / 50.0f)
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        // EQ Bands 2-5: Scale 0-200 to 0.0-2.0 gain (100 is 1.0)
         val eqSeekBars = listOf(
-            binding.seekBarBand1,
             binding.seekBarBand2,
             binding.seekBarBand3,
             binding.seekBarBand4,
@@ -55,7 +66,7 @@ class MainActivity : AppCompatActivity() {
         eqSeekBars.forEachIndexed { index, seekBar ->
             seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                    setEqualizerBandGain(index, progress / 100.0f)
+                    setEqualizerBandGain(index + 1, progress / 100.0f)
                 }
                 override fun onStartTrackingTouch(seekBar: SeekBar?) {}
                 override fun onStopTrackingTouch(seekBar: SeekBar?) {}
