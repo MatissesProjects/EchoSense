@@ -1,8 +1,12 @@
 package com.echosense.app
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -12,6 +16,7 @@ import androidx.lifecycle.lifecycleScope
 import com.echosense.app.databinding.ActivityMainBinding
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
@@ -21,18 +26,23 @@ class MainActivity : AppCompatActivity() {
     private val fftData = FloatArray(512)
     private val eqCurveData = FloatArray(100)
 
+    private var speechRecognizer: SpeechRecognizer? = null
+    private lateinit var recognizerIntent: Intent
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         setupUI()
+        setupSpeechRecognizer()
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), RECORD_AUDIO_PERMISSION_CODE)
         } else {
             startAudioEngine()
             startVisualizer()
+            startListening()
         }
     }
 
@@ -54,7 +64,6 @@ class MainActivity : AppCompatActivity() {
 
         binding.seekBarPreAmp.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                // Scale 0-100 to 0.0-10.0 (progress / 10.0)
                 setPreAmpGain(progress / 10.0f)
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
@@ -63,7 +72,6 @@ class MainActivity : AppCompatActivity() {
 
         binding.seekBarVoiceBoost.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                // Scale 0-100 to 0.0-20.0 dB (progress / 5.0)
                 setVoiceBoost(progress / 5.0f)
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
@@ -108,6 +116,53 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupSpeechRecognizer() {
+        if (SpeechRecognizer.isRecognitionAvailable(this)) {
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
+            recognizerIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                // Prefer offline recognition for privacy and low latency
+                putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            }
+
+            speechRecognizer?.setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) {}
+                override fun onBeginningOfSpeech() {}
+                override fun onRmsChanged(rmsdB: Float) {}
+                override fun onBufferReceived(buffer: ByteArray?) {}
+                override fun onEndOfSpeech() {}
+                
+                override fun onError(error: Int) {
+                    // Restart listening on error (e.g. timeout)
+                    if (isAudioEngineRunning()) startListening()
+                }
+
+                override fun onResults(results: Bundle?) {
+                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    if (!matches.isNullOrEmpty()) {
+                        binding.tvTranscription.text = matches[0]
+                    }
+                    startListening() // Keep listening
+                }
+
+                override fun onPartialResults(partialResults: Bundle?) {
+                    val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    if (!matches.isNullOrEmpty()) {
+                        binding.tvTranscription.text = matches[0]
+                    }
+                }
+
+                override fun onEvent(eventType: Int, params: Bundle?) {}
+            })
+        }
+    }
+
+    private fun startListening() {
+        speechRecognizer?.startListening(recognizerIntent)
+    }
+
     private fun startVisualizer() {
         lifecycleScope.launch {
             while (true) {
@@ -131,6 +186,7 @@ class MainActivity : AppCompatActivity() {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startAudioEngine()
                 startVisualizer()
+                startListening()
             }
         }
     }
@@ -138,6 +194,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         stopAudioEngine()
+        speechRecognizer?.destroy()
     }
 
     external fun startAudioEngine()

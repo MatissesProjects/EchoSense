@@ -43,10 +43,10 @@ EchoSense is an Android-first application designed to act as an intelligent, con
 ## 5. Development Phases
 
 ### Phase 1: The Wired "Zero-Latency" Foundation
-* [ ] Setup Android project with C++ (NDK) support.
-* [ ] Implement Oboe for direct USB-C Mic -> USB-C Headphone audio passthrough.
-* [ ] Build basic DSP: Implement a noise gate and a 5-band EQ slider in the UI.
-* [ ] Test latency and ensure audio is perfectly synced.
+* [x] Setup Android project with C++ (NDK) support.
+* [x] Implement Oboe for direct USB-C Mic -> USB-C Headphone audio passthrough.
+* [x] Build basic DSP: Implement a noise gate and a 5-band EQ slider in the UI.
+* [x] Test latency and ensure audio is perfectly synced.
 
 ### Phase 2: Multi-Mic Array & WearOS Link
 * [ ] Implement `AudioManager` routing to allow switching between the Phone Mic and the Headset Mic via the UI.

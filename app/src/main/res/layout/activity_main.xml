@@ -46,9 +46,33 @@
         <com.echosense.app.FrequencyVisualizerView
             android:id="@+id/visualizerView"
             android:layout_width="match_parent"
-            android:layout_height="180dp"
+            android:layout_height="120dp"
             android:background="#1E1E1E"
             android:layout_marginBottom="16dp" />
+
+        <!-- Live Caption Area -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Live Transcription"
+            android:textColor="#BBBBBB"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            android:background="#000000"
+            android:padding="12dp"
+            android:layout_marginBottom="16dp">
+            <TextView
+                android:id="@+id/tvTranscription"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:text="Waiting for speech..."
+                android:textColor="#00FF00"
+                android:textSize="18sp"
+                android:scrollbars="vertical" />
+        </FrameLayout>
 
         <TextView
             android:layout_width="wrap_content"
@@ -66,7 +90,6 @@
             android:progressTint="#4CAF50"
             android:layout_marginBottom="16dp" />
 
-        <!-- New: Pre-Amp / Sensitivity -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -81,7 +104,6 @@
             android:progress="10"
             android:layout_marginBottom="16dp" />
 
-        <!-- New: Voice clarity -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -123,6 +145,7 @@
             android:progress="0"
             android:layout_marginBottom="16dp" />
 
+        <!-- EQ Bands -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
