@@ -34,6 +34,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupUI() {
+        // Master Gain: Scale 0-200 to 0.0-20.0 (progress / 10.0)
+        binding.seekBarMasterGain.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                setMasterGain(progress / 10.0f)
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
         // Noise Gate: Scale 0-100 to 0.0-0.5 threshold
         binding.seekBarNoiseGate.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
@@ -98,6 +107,7 @@ class MainActivity : AppCompatActivity() {
     external fun startAudioEngine()
     external fun stopAudioEngine()
     external fun setNoiseGateThreshold(threshold: Float)
+    external fun setMasterGain(gain: Float)
     external fun setEqualizerBandGain(bandIndex: Int, gain: Float)
     external fun getVolumeLevel(): Float
 

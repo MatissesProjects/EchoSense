@@ -74,6 +74,7 @@ public:
     // Parameter updates
     void setNoiseGateThreshold(float threshold);
     void setEqualizerBandGain(int bandIndex, float gainDb);
+    void setMasterGain(float gain);
     float getVolumeLevel() const { return mCurrentVolume.load(); }
 
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) override;
@@ -86,6 +87,7 @@ private:
     // Parameters (atomic for thread safety)
     std::atomic<float> mNoiseGateThreshold{0.0f};
     std::atomic<float> mBandGains[5];
+    std::atomic<float> mMasterGain{1.0f};
     std::atomic<float> mCurrentVolume{0.0f};
     std::atomic<bool> mParamsChanged{true};
 

@@ -73,6 +73,10 @@ void AudioEngine::setNoiseGateThreshold(float threshold) {
     mNoiseGateThreshold.store(threshold);
 }
 
+void AudioEngine::setMasterGain(float gain) {
+    mMasterGain.store(gain);
+}
+
 void AudioEngine::setEqualizerBandGain(int bandIndex, float gainDb) {
     if (bandIndex >= 0 && bandIndex < 5) {
         mBandGains[bandIndex].store(gainDb);
@@ -102,6 +106,11 @@ float AudioEngine::processSample(float sample) {
     for (int i = 0; i < 5; ++i) {
         out = mEQBands[i].process(out);
     }
+
+    // 4. Master Gain & Limiter
+    out *= mMasterGain.load();
+    if (out > 1.0f) out = 1.0f;
+    if (out < -1.0f) out = -1.0f;
 
     return out;
 }

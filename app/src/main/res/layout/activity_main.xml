@@ -35,6 +35,20 @@
             android:progressTint="#4CAF50"
             android:layout_marginBottom="24dp" />
 
+        <!-- Master Gain -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Master Gain Boost"
+            android:textStyle="bold" />
+        <SeekBar
+            android:id="@+id/seekBarMasterGain"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="200"
+            android:progress="10"
+            android:layout_marginBottom="16dp" />
+
         <!-- Noise Gate -->
         <TextView
             android:layout_width="wrap_content"

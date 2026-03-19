@@ -29,6 +29,13 @@ Java_com_echosense_app_MainActivity_setNoiseGateThreshold(JNIEnv *env, jobject /
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_echosense_app_MainActivity_setMasterGain(JNIEnv *env, jobject /* this */, jfloat gain) {
+    if (audioEngine != nullptr) {
+        audioEngine->setMasterGain(gain);
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_echosense_app_MainActivity_setEqualizerBandGain(JNIEnv *env, jobject /* this */, jint bandIndex, jfloat gain) {
     if (audioEngine != nullptr) {
         audioEngine->setEqualizerBandGain(bandIndex, gain);
