@@ -1,9 +1,13 @@
 #include "AudioEngine.h"
 #include <android/log.h>
+#include <cmath>
 
 #define TAG "AudioEngine"
 
 AudioEngine::AudioEngine() {
+    for (int i = 0; i < 5; ++i) {
+        mBandGains[i].store(1.0f); // Default gain 1.0 (no change)
+    }
 }
 
 AudioEngine::~AudioEngine() {
@@ -41,7 +45,31 @@ void AudioEngine::stop() {
     }
 }
 
+void AudioEngine::setNoiseGateThreshold(float threshold) {
+    mNoiseGateThreshold.store(threshold);
+}
+
+void AudioEngine::setEqualizerBandGain(int bandIndex, float gain) {
+    if (bandIndex >= 0 && bandIndex < 5) {
+        mBandGains[bandIndex].store(gain);
+    }
+}
+
+float AudioEngine::processSample(float sample) {
+    // POC: Simple Noise Gate
+    float absSample = std::abs(sample);
+    if (absSample < mNoiseGateThreshold.load()) {
+        return 0.0f;
+    }
+
+    // POC: Simple Volume Boost (using first band gain as master volume for now)
+    return sample * mBandGains[0].load();
+}
+
 oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
-    // Process audio data here
+    float *floatData = static_cast<float *>(audioData);
+    for (int i = 0; i < numFrames; ++i) {
+        floatData[i] = processSample(floatData[i]);
+    }
     return oboe::DataCallbackResult::Continue;
 }
