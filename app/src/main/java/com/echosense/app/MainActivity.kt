@@ -43,20 +43,9 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
 
-        // Band 1: Master Boost (0.0 to 10.0 range)
-        binding.seekBarBand1.max = 500 // 0 to 500 range
-        binding.seekBarBand1.progress = 50 // Default to 1.0 (50/5)
-        binding.seekBarBand1.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                // Scale 0-500 to 0.0-10.0 (progress / 50.0)
-                setEqualizerBandGain(0, progress / 50.0f)
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
-
-        // EQ Bands 2-5: Scale 0-200 to 0.0-2.0 gain (100 is 1.0)
+        // EQ Bands (Bands 1-5): Scale 0-200 to -12dB to +12dB (100 is 0dB)
         val eqSeekBars = listOf(
+            binding.seekBarBand1,
             binding.seekBarBand2,
             binding.seekBarBand3,
             binding.seekBarBand4,
@@ -64,9 +53,13 @@ class MainActivity : AppCompatActivity() {
         )
 
         eqSeekBars.forEachIndexed { index, seekBar ->
+            seekBar.max = 200
+            seekBar.progress = 100 // 0dB
             seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                    setEqualizerBandGain(index + 1, progress / 100.0f)
+                    // Map 0-200 to -12.0 to +12.0 dB
+                    val gainDb = (progress - 100) * 0.12f
+                    setEqualizerBandGain(index, gainDb)
                 }
                 override fun onStartTrackingTouch(seekBar: SeekBar?) {}
                 override fun onStopTrackingTouch(seekBar: SeekBar?) {}
@@ -78,11 +71,9 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             while (true) {
                 val volume = getVolumeLevel()
-                // Map volume (0.0 to 1.0) to 0-100 progress
-                // Multiplied by 500 for better visibility of low levels
                 val progress = (volume * 500).toInt().coerceIn(0, 100)
                 binding.progressBarVolume.progress = progress
-                delay(33) // ~30 FPS
+                delay(33)
             }
         }
     }

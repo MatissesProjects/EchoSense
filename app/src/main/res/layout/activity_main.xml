@@ -52,7 +52,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Band 1: Master Gain" />
+            android:text="Band 1: Low (200Hz)" />
         <SeekBar
             android:id="@+id/seekBarBand1"
             android:layout_width="match_parent"
@@ -76,7 +76,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Band 3: Mid (1kHz)" />
+            android:text="Band 3: Mid (1.5kHz)" />
         <SeekBar
             android:id="@+id/seekBarBand3"
             android:layout_width="match_parent"
@@ -100,7 +100,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Band 5: High (8kHz)" />
+            android:text="Band 5: High (6kHz)" />
         <SeekBar
             android:id="@+id/seekBarBand5"
             android:layout_width="match_parent"
@@ -108,6 +108,14 @@
             android:max="200"
             android:progress="100"
             android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="* A fixed 150Hz High-Pass filter is active to reduce fan noise."
+            android:textSize="12sp"
+            android:layout_marginTop="16dp"
+            android:textColor="#888888" />
 
     </LinearLayout>
 </ScrollView>

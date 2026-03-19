@@ -7,7 +7,7 @@
 
 AudioEngine::AudioEngine() {
     for (int i = 0; i < 5; ++i) {
-        mBandGains[i].store(1.0f);
+        mBandGains[i].store(0.0f); // 0dB = neutral
     }
 }
 
@@ -31,9 +31,12 @@ bool AudioEngine::start() {
         return false;
     }
 
+    mSampleRate = (float) mPlaybackStream->getSampleRate();
+
     // --- 2. Setup Recording Stream ---
     builder.setDirection(oboe::Direction::Input);
     builder.setDataCallback(this);
+    builder.setSampleRate((int32_t)mSampleRate); // Match playback sample rate
 
     result = builder.openStream(&mRecordingStream);
     if (result != oboe::Result::OK) {
@@ -42,7 +45,13 @@ bool AudioEngine::start() {
         return false;
     }
 
-    // Start playback first, then recording
+    // Initialize High-Pass filter to cut fan rumble (150Hz)
+    mHighPass.setHighPass(150.0f, mSampleRate, 0.707f);
+
+    // Initial filter update
+    updateFilters();
+
+    // Start streams
     mPlaybackStream->requestStart();
     mRecordingStream->requestStart();
 
@@ -64,18 +73,37 @@ void AudioEngine::setNoiseGateThreshold(float threshold) {
     mNoiseGateThreshold.store(threshold);
 }
 
-void AudioEngine::setEqualizerBandGain(int bandIndex, float gain) {
+void AudioEngine::setEqualizerBandGain(int bandIndex, float gainDb) {
     if (bandIndex >= 0 && bandIndex < 5) {
-        mBandGains[bandIndex].store(gain);
+        mBandGains[bandIndex].store(gainDb);
+        mParamsChanged.store(true);
     }
 }
 
+void AudioEngine::updateFilters() {
+    float freqs[5] = {200.0f, 500.0f, 1500.0f, 3000.0f, 6000.0f};
+    for (int i = 0; i < 5; ++i) {
+        mEQBands[i].setPeaking(freqs[i], mSampleRate, 1.0f, mBandGains[i].load());
+    }
+    mParamsChanged.store(false);
+}
+
 float AudioEngine::processSample(float sample) {
+    // 1. Noise Gate (Pre-EQ)
     float absSample = std::abs(sample);
     if (absSample < mNoiseGateThreshold.load()) {
         return 0.0f;
     }
-    return sample * mBandGains[0].load();
+
+    // 2. High Pass Filter (Permanent Low-Cut for fan/rumble)
+    float out = mHighPass.process(sample);
+
+    // 3. 5-Band Equalizer (Cascaded Biquads)
+    for (int i = 0; i < 5; ++i) {
+        out = mEQBands[i].process(out);
+    }
+
+    return out;
 }
 
 void AudioEngine::calculateVolume(const float* data, int numFrames) {
@@ -90,17 +118,22 @@ void AudioEngine::calculateVolume(const float* data, int numFrames) {
 oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
     float *floatData = static_cast<float *>(audioData);
 
-    // 1. Process audio samples in-place
+    // Check if UI changed any EQ parameters
+    if (mParamsChanged.load()) {
+        updateFilters();
+    }
+
+    // 1. Process audio samples
     for (int i = 0; i < numFrames; ++i) {
         floatData[i] = processSample(floatData[i]);
     }
 
-    // 2. Calculate volume for UI visualizer
+    // 2. Volume Meter
     calculateVolume(floatData, numFrames);
 
-    // 3. Write processed data to the playback stream
+    // 3. Playback
     if (mPlaybackStream != nullptr) {
-        mPlaybackStream->write(floatData, numFrames, 0); // Write with zero timeout to avoid blocking
+        mPlaybackStream->write(floatData, numFrames, 0);
     }
 
     return oboe::DataCallbackResult::Continue;
