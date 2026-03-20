@@ -11,14 +11,28 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="EchoSense Intelligence"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:textColor="#FFFFFF"
-            android:layout_marginBottom="16dp" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="EchoSense AI"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF" />
+            <Button
+                android:id="@+id/btnExitApp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Exit"
+                android:textSize="12sp"
+                android:backgroundTint="#D32F2F" />
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -39,9 +53,54 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Auto-Tune"
+                android:text="AI Auto-Tune"
                 android:backgroundTint="#FF9800" />
         </LinearLayout>
+
+        <!-- Profiles Section -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Audio Profile"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chipGroupProfile"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:singleSelection="true">
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipProfileVoice"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Voice"
+                android:textColor="#FFFFFF" />
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipProfileMusic"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Music"
+                android:textColor="#FFFFFF" />
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipProfileTV"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="TV"
+                android:textColor="#FFFFFF" />
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipProfileCustom"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Custom"
+                android:checked="true"
+                android:textColor="#FFFFFF" />
+        </com.google.android.material.chip.ChipGroup>
 
         <!-- Mic Selection -->
         <LinearLayout
@@ -83,7 +142,6 @@
             </RadioGroup>
         </LinearLayout>
 
-        <!-- Bluetooth Optimization -->
         <LinearLayout
             android:id="@+id/layoutBluetoothOpt"
             android:layout_width="match_parent"
@@ -176,24 +234,11 @@
             android:progressTint="#4CAF50"
             android:layout_marginBottom="16dp" />
 
+        <!-- AI Voice Boost Slider -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Mic Sensitivity (Pre-Amp)"
-            android:textColor="#FFFFFF"
-            android:textStyle="bold" />
-        <SeekBar
-            android:id="@+id/seekBarPreAmp"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:max="100"
-            android:progress="10"
-            android:layout_marginBottom="16dp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Voice Clarity Boost"
+            android:text="AI Voice Clarity Boost"
             android:textColor="#4FC3F7"
             android:textStyle="bold" />
         <SeekBar
@@ -207,15 +252,27 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:text="Mic Sensitivity (Pre-Amp)"
+            android:textColor="#FFFFFF" />
+        <SeekBar
+            android:id="@+id/seekBarPreAmp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="10"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:text="Master Output Gain"
-            android:textColor="#FFFFFF"
-            android:textStyle="bold" />
+            android:textColor="#FFFFFF" />
         <SeekBar
             android:id="@+id/seekBarMasterGain"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:max="200"
-            android:progress="4"
+            android:progress="10"
             android:layout_marginBottom="16dp" />
 
         <TextView
@@ -231,63 +288,43 @@
             android:progress="0"
             android:layout_marginBottom="16dp" />
 
+        <!-- Dramatic 5-Band EQ -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Band 1: Low (200Hz)"
-            android:textColor="#FFFFFF" />
+            android:text="Bands: +/- 24dB"
+            android:textColor="#888888"
+            android:textSize="12sp"
+            android:layout_marginBottom="8dp" />
+
         <SeekBar
             android:id="@+id/seekBarBand1"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:max="200"
             android:progress="100"
-            android:layout_marginBottom="16dp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Band 2: Low-Mid (500Hz)"
-            android:textColor="#FFFFFF" />
+            android:layout_marginBottom="8dp" />
         <SeekBar
             android:id="@+id/seekBarBand2"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:max="200"
             android:progress="100"
-            android:layout_marginBottom="16dp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Band 3: Mid (1.5kHz)"
-            android:textColor="#FFFFFF" />
+            android:layout_marginBottom="8dp" />
         <SeekBar
             android:id="@+id/seekBarBand3"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:max="200"
             android:progress="100"
-            android:layout_marginBottom="16dp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Band 4: High-Mid (3kHz)"
-            android:textColor="#FFFFFF" />
+            android:layout_marginBottom="8dp" />
         <SeekBar
             android:id="@+id/seekBarBand4"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:max="200"
             android:progress="100"
-            android:layout_marginBottom="16dp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Band 5: High (6kHz)"
-            android:textColor="#FFFFFF" />
+            android:layout_marginBottom="8dp" />
         <SeekBar
             android:id="@+id/seekBarBand5"
             android:layout_width="match_parent"

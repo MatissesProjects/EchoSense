@@ -30,7 +30,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.Locale
 
-class MainActivity : AppCompatActivity(), MessageClient.OnMessageReceivedListener {
+class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private val PERMISSION_REQUEST_CODE = 1
@@ -53,8 +53,6 @@ class MainActivity : AppCompatActivity(), MessageClient.OnMessageReceivedListene
         setupUI()
         setupSpeechRecognizer()
         checkPermissions()
-        
-        Wearable.getMessageClient(this).addListener(this)
     }
 
     override fun onResume() {
@@ -75,51 +73,32 @@ class MainActivity : AppCompatActivity(), MessageClient.OnMessageReceivedListene
     }
 
     override fun onDestroy() {
-        Wearable.getMessageClient(this).removeListener(this)
         super.onDestroy()
         speechRecognizer?.destroy()
     }
 
-    override fun onMessageReceived(messageEvent: MessageEvent) {
-        if (messageEvent.path == WEAR_AUDIO_PATH) {
-            val pcmData = messageEvent.data
-            // Convert ByteArray (PCM 16-bit) to FloatArray for C++
-            val shortBuffer = ByteBuffer.wrap(pcmData).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
-            val floatArray = FloatArray(shortBuffer.remaining())
-            for (i in floatArray.indices) {
-                floatArray[i] = shortBuffer.get().toFloat() / 32768.0f
-            }
-            writeRemoteAudio(floatArray)
-        }
-    }
-
     private fun checkPermissions() {
         val permissions = mutableListOf(Manifest.permission.RECORD_AUDIO)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
         
-        val missing = permissions.filter {
-            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-        }
-
-        if (missing.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this, missing.toTypedArray(), PERMISSION_REQUEST_CODE)
-        }
+        val missing = permissions.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
+        if (missing.isNotEmpty()) ActivityCompat.requestPermissions(this, missing.toTypedArray(), PERMISSION_REQUEST_CODE)
     }
 
     private fun hasAllPermissions(): Boolean {
         var granted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            granted = granted && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) granted = granted && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         return granted
     }
 
     private fun setupUI() {
+        binding.btnExitApp.setOnClickListener {
+            stopService(Intent(this, EchoSenseService::class.java))
+            stopListening()
+            finishAndRemoveTask()
+        }
+
         binding.btnToggleEngine.setOnClickListener {
             if (isAudioEngineRunning()) {
                 stopService(Intent(this, EchoSenseService::class.java))
@@ -134,7 +113,17 @@ class MainActivity : AppCompatActivity(), MessageClient.OnMessageReceivedListene
 
         binding.btnAutoTune.setOnClickListener {
             autoTune()
-            Toast.makeText(this, "AI Auto-Tune Applied", Toast.LENGTH_SHORT).show()
+            binding.chipGroupProfile.check(R.id.chipProfileCustom)
+            Toast.makeText(this, "AI Adaptive Tuning Applied", Toast.LENGTH_SHORT).show()
+        }
+
+        binding.chipGroupProfile.setOnCheckedChangeListener { _, checkedId ->
+            when (checkedId) {
+                R.id.chipProfileVoice -> setProfile(0)
+                R.id.chipProfileMusic -> setProfile(1)
+                R.id.chipProfileTV -> setProfile(2)
+                R.id.chipProfileCustom -> setProfile(3)
+            }
         }
 
         binding.rgMicSource.setOnCheckedChangeListener { _, checkedId ->
@@ -143,32 +132,20 @@ class MainActivity : AppCompatActivity(), MessageClient.OnMessageReceivedListene
                     val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
                     val phoneMic = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS).find { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
                     phoneMic?.let { setInputDevice(it.id) }
-                    setInputSource(1) // Phone
+                    setInputSource(1)
                 }
-                R.id.rbMicWatch -> {
-                    setInputSource(2) // Watch
-                }
-                else -> {
-                    setInputDevice(-1)
-                    setInputSource(0) // Default
-                }
+                R.id.rbMicWatch -> setInputSource(2)
+                else -> { setInputDevice(-1); setInputSource(0) }
             }
             restartEngineIfRunning()
         }
 
         binding.swBluetoothAnc.setOnCheckedChangeListener { _, isChecked ->
-            // Note: True ANC control is often vendor-specific.
-            // Here we hint to the system we want high-quality voice/noise reduction context.
             val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            if (isChecked) {
-                audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-                Toast.makeText(this, "Requesting Wireless ANC Mode...", Toast.LENGTH_SHORT).show()
-            } else {
-                audioManager.mode = AudioManager.MODE_NORMAL
-            }
+            if (isChecked) audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+            else audioManager.mode = AudioManager.MODE_NORMAL
         }
 
-        // Power Controls
         binding.cbKeepScreenOn.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -178,7 +155,7 @@ class MainActivity : AppCompatActivity(), MessageClient.OnMessageReceivedListene
             val params = window.attributes
             if (!isDimmed) {
                 params.screenBrightness = 0.01f
-                binding.btnDimScreen.text = "Restore Brightness"
+                binding.btnDimScreen.text = "Restore"
                 isDimmed = true
             } else {
                 params.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
@@ -188,7 +165,6 @@ class MainActivity : AppCompatActivity(), MessageClient.OnMessageReceivedListene
             window.attributes = params
         }
 
-        // Sliders
         binding.seekBarPreAmp.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { setPreAmpGain(p / 10.0f) }
             override fun onStartTrackingTouch(s: SeekBar?) {}
@@ -196,7 +172,10 @@ class MainActivity : AppCompatActivity(), MessageClient.OnMessageReceivedListene
         })
 
         binding.seekBarVoiceBoost.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { setVoiceBoost(p / 5.0f) }
+            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
+                // Scale 0-100 to 0.0-30.0 dB for powerful AI boost
+                setVoiceBoost(p * 0.3f) 
+            }
             override fun onStartTrackingTouch(s: SeekBar?) {}
             override fun onStopTrackingTouch(s: SeekBar?) {}
         })
@@ -215,8 +194,14 @@ class MainActivity : AppCompatActivity(), MessageClient.OnMessageReceivedListene
 
         val eqSeekBars = listOf(binding.seekBarBand1, binding.seekBarBand2, binding.seekBarBand3, binding.seekBarBand4, binding.seekBarBand5)
         eqSeekBars.forEachIndexed { index, seekBar ->
+            seekBar.max = 200
+            seekBar.progress = 100
             seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { setEqualizerBandGain(index, (p - 100) * 0.12f) }
+                override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
+                    // Map 0-200 to -24dB to +24dB for dramatic control
+                    val gainDb = (p - 100) * 0.24f
+                    setEqualizerBandGain(index, gainDb) 
+                }
                 override fun onStartTrackingTouch(s: SeekBar?) {}
                 override fun onStopTrackingTouch(s: SeekBar?) {}
             })
@@ -312,6 +297,7 @@ class MainActivity : AppCompatActivity(), MessageClient.OnMessageReceivedListene
     external fun setVoiceBoost(gainDb: Float)
     external fun setNoiseGateThreshold(threshold: Float)
     external fun setMasterGain(gain: Float)
+    external fun setProfile(profile: Int)
     external fun setEqualizerBandGain(bandIndex: Int, gain: Float)
     external fun getVolumeLevel(): Float
     external fun getFftData(output: FloatArray)
