@@ -82,6 +82,13 @@ Java_com_echosense_app_MainActivity_setMasterGain(JNIEnv *env, jobject /* this *
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_echosense_app_MainActivity_setProfile(JNIEnv *env, jobject /* this */, jint profile) {
+    if (audioEngine != nullptr) {
+        audioEngine->setProfile(static_cast<AudioProfile>(profile));
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_echosense_app_MainActivity_setEqualizerBandGain(JNIEnv *env, jobject /* this */, jint bandIndex, jfloat gain) {
     if (audioEngine != nullptr) {
         audioEngine->setEqualizerBandGain(bandIndex, gain);
@@ -138,5 +145,15 @@ Java_com_echosense_app_EchoSenseService_stopAudioEngine(JNIEnv *env, jobject /* 
         audioEngine->stop();
         delete audioEngine;
         audioEngine = nullptr;
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_echosense_app_EchoSenseService_writeRemoteAudio(JNIEnv *env, jobject /* this */, jfloatArray data) {
+    if (audioEngine != nullptr) {
+        jfloat *c_data = env->GetFloatArrayElements(data, NULL);
+        jsize len = env->GetArrayLength(data);
+        audioEngine->writeRemoteAudio(c_data, len);
+        env->ReleaseFloatArrayElements(data, c_data, JNI_ABORT);
     }
 }

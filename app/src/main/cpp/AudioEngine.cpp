@@ -15,12 +15,10 @@ AudioEngine::~AudioEngine() {
 
 bool AudioEngine::start() {
     if (mIsRunning.load()) return true;
-    oboe::AudioStreamBuilder builder;
-
     mCurrentRampGain = 0.0f;
     mParamsChanged.store(true);
 
-    // 1. Playback Stream
+    oboe::AudioStreamBuilder builder;
     builder.setDirection(oboe::Direction::Output);
     builder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
     builder.setSharingMode(oboe::SharingMode::Shared);
@@ -33,7 +31,6 @@ bool AudioEngine::start() {
     if (builder.openStream(&mPlaybackStream) != oboe::Result::OK) return false;
     mSampleRate = (float) mPlaybackStream->getSampleRate();
 
-    // 2. Recording Stream
     oboe::AudioStreamBuilder recBuilder;
     recBuilder.setDirection(oboe::Direction::Input);
     recBuilder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
@@ -45,9 +42,7 @@ bool AudioEngine::start() {
     recBuilder.setFormat(oboe::AudioFormat::Float);
     
     int32_t deviceId = mInputDeviceId.load();
-    if (deviceId != oboe::kUnspecified) {
-        recBuilder.setDeviceId(deviceId);
-    }
+    if (deviceId != oboe::kUnspecified) recBuilder.setDeviceId(deviceId);
 
     if (recBuilder.openStream(&mRecordingStream) != oboe::Result::OK) {
         mPlaybackStream->close();
@@ -56,7 +51,6 @@ bool AudioEngine::start() {
 
     mHighPass.setHighPass(150.0f, mSampleRate, 0.707f);
     updateFilters();
-
     mRecordingStream->requestStart();
     mPlaybackStream->requestStart();
     mIsRunning.store(true);
@@ -66,25 +60,12 @@ bool AudioEngine::start() {
 void AudioEngine::stop() {
     if (!mIsRunning.load()) return;
     mIsRunning.store(false);
-    if (mRecordingStream) {
-        mRecordingStream->stop();
-        mRecordingStream->close();
-        mRecordingStream = nullptr;
-    }
-    if (mPlaybackStream) {
-        mPlaybackStream->stop();
-        mPlaybackStream->close();
-        mPlaybackStream = nullptr;
-    }
+    if (mRecordingStream) { mRecordingStream->stop(); mRecordingStream->close(); mRecordingStream = nullptr; }
+    if (mPlaybackStream) { mPlaybackStream->stop(); mPlaybackStream->close(); mPlaybackStream = nullptr; }
 }
 
-void AudioEngine::setInputSource(InputSource source) {
-    mInputSource.store(source);
-}
-
-void AudioEngine::setInputDevice(int32_t deviceId) {
-    mInputDeviceId.store(deviceId);
-}
+void AudioEngine::setInputSource(InputSource source) { mInputSource.store(source); }
+void AudioEngine::setInputDevice(int32_t deviceId) { mInputDeviceId.store(deviceId); }
 
 void AudioEngine::writeRemoteAudio(const float* data, int32_t numFrames) {
     for (int i = 0; i < numFrames; ++i) {
@@ -106,29 +87,70 @@ void AudioEngine::setEqualizerBandGain(int bandIndex, float gainDb) {
     }
 }
 
+void AudioEngine::setProfile(AudioProfile profile) {
+    mAudioProfile.store(profile);
+    if (profile == AudioProfile::Voice) {
+        mBandGains[0].store(-12.0f); // Low cut
+        mBandGains[1].store(-6.0f);
+        mBandGains[2].store(3.0f);   // Speech body
+        mBandGains[3].store(8.0f);   // Clarity
+        mBandGains[4].store(-3.0f);
+        mVoiceBoostDb.store(10.0f);
+    } else if (profile == AudioProfile::Music) {
+        mBandGains[0].store(4.0f);   // Bass
+        mBandGains[1].store(0.0f);
+        mBandGains[2].store(-2.0f);
+        mBandGains[3].store(2.0f);
+        mBandGains[4].store(4.0f);   // Sparkle
+        mVoiceBoostDb.store(0.0f);
+    } else if (profile == AudioProfile::TV) {
+        mBandGains[0].store(-6.0f);
+        mBandGains[1].store(0.0f);
+        mBandGains[2].store(4.0f);
+        mBandGains[3].store(6.0f);
+        mBandGains[4].store(-4.0f);
+        mVoiceBoostDb.store(6.0f);
+    }
+    mParamsChanged.store(true);
+}
+
 void AudioEngine::updateFilters() {
     float freqs[5] = {200.0f, 500.0f, 1500.0f, 3000.0f, 6000.0f};
     for (int i = 0; i < 5; ++i) mEQBands[i].setPeaking(freqs[i], mSampleRate, 1.0f, mBandGains[i].load());
-    mVoiceFilters[0].setHighPass(300.0f, mSampleRate, 0.707f);
-    mVoiceFilters[1].setLowPass(3500.0f, mSampleRate, 0.707f);
+    // Gentler Q for voice filters to avoid "ringing"
+    mVoiceFilters[0].setPeaking(700.0f, mSampleRate, 0.4f, mVoiceBoostDb.load() * 0.4f);
+    mVoiceFilters[1].setPeaking(3200.0f, mSampleRate, 0.4f, mVoiceBoostDb.load() * 0.8f);
     mParamsChanged.store(false);
 }
 
 inline float AudioEngine::processSample(float sample) {
     if (mCurrentRampGain < 1.0f) mCurrentRampGain += mRampStep;
+
+    if (mLearningNoise.load()) return 0.0f;
+
     float out = sample * mPreAmpGain.load();
-    if (std::abs(out) < mNoiseGateThreshold.load()) return 0.0f;
+
+    // Improved Noise Gate with soft knee
+    float absOut = std::abs(out);
+    float threshold = mNoiseGateThreshold.load();
+    if (absOut < threshold) return 0.0f;
+
     out = mHighPass.process(out);
-    float voicePath = out;
-    voicePath = mVoiceFilters[0].process(voicePath);
-    voicePath = mVoiceFilters[1].process(voicePath);
-    float voiceGain = powf(10.0f, mVoiceBoostDb.load() / 20.0f);
-    float eqPath = out;
-    for (int i = 0; i < 5; ++i) eqPath = mEQBands[i].process(eqPath);
-    out = eqPath + (voicePath * voiceGain);
+
+    // Serial Processing Path for better predictability
+    // 1. Voice Shaping
+    out = mVoiceFilters[0].process(out);
+    out = mVoiceFilters[1].process(out);
+
+    // 2. Graphic Equalizer
+    for (int i = 0; i < 5; ++i) {
+        out = mEQBands[i].process(out);
+    }
+
     out *= mMasterGain.load() * mCurrentRampGain;
     return std::clamp(out, -1.0f, 1.0f);
 }
+
 
 void AudioEngine::updateVisualization(const float* data, int numFrames) {
     std::lock_guard<std::mutex> lock(mVisMutex);
@@ -146,20 +168,27 @@ void AudioEngine::getFftData(float* output, int size) {
 }
 
 void AudioEngine::getEqCurveData(float* output, int size) {
-    float voiceGain = powf(10.0f, mVoiceBoostDb.load() / 20.0f);
     for (int i = 0; i < size; ++i) {
         float freq = 20.0f * powf(1000.0f, (float)i / (float)size);
         float eqMag = mHighPass.getMagnitude(freq, mSampleRate);
         for (int b = 0; b < 5; ++b) eqMag *= mEQBands[b].getMagnitude(freq, mSampleRate);
-        float vMag = mHighPass.getMagnitude(freq, mSampleRate) * mVoiceFilters[0].getMagnitude(freq, mSampleRate) * mVoiceFilters[1].getMagnitude(freq, mSampleRate) * voiceGain;
-        output[i] = eqMag + vMag;
+        float vMag = mVoiceFilters[0].getMagnitude(freq, mSampleRate) * mVoiceFilters[1].getMagnitude(freq, mSampleRate);
+        output[i] = eqMag * vMag;
     }
 }
 
 void AudioEngine::autoTune() {
-    mBandGains[0].store(-10.0f); mBandGains[1].store(-5.0f);
-    mBandGains[2].store(5.0f); mBandGains[3].store(8.0f);
-    mVoiceBoostDb.store(10.0f); mParamsChanged.store(true);
+    // Intelligent heuristic: 
+    // 1. Kill the low end (Fan)
+    // 2. Scoop the low-mids (Mud)
+    // 3. Peak the clarity (3k)
+    mBandGains[0].store(-18.0f); // Massive cut to fan rumble
+    mBandGains[1].store(-8.0f);  // Cut mud
+    mBandGains[2].store(4.0f);   // Slight speech body boost
+    mBandGains[3].store(12.0f);  // Massive clarity boost
+    mBandGains[4].store(-6.0f);  // Cut hiss
+    mVoiceBoostDb.store(15.0f);  // High AI Voice Boost
+    mParamsChanged.store(true);
 }
 
 oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {

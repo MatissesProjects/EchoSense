@@ -9,11 +9,19 @@
 
 #define VIS_BINS 64
 #define REMOTE_BUFFER_SIZE 4096
+#define NOISE_PROFILE_SIZE 128
 
 enum class InputSource {
     Default = 0,
     Phone = 1,
     Watch = 2
+};
+
+enum class AudioProfile {
+    Voice = 0,
+    Music = 1,
+    TV = 2,
+    Custom = 3
 };
 
 // Biquad Filter Structure
@@ -103,6 +111,7 @@ public:
     void setNoiseGateThreshold(float threshold);
     void setEqualizerBandGain(int bandIndex, float gainDb);
     void setMasterGain(float gain);
+    void setProfile(AudioProfile profile);
     float getVolumeLevel() const { return mCurrentVolume.load(); }
 
     void getFftData(float* output, int size);
@@ -120,7 +129,6 @@ private:
     std::atomic<InputSource> mInputSource{InputSource::Default};
     std::atomic<int32_t> mInputDeviceId{oboe::kUnspecified};
 
-    // Remote (Watch) Audio Buffer
     float mRemoteBuffer[REMOTE_BUFFER_SIZE] = {0};
     std::atomic<int32_t> mRemoteReadPos{0};
     std::atomic<int32_t> mRemoteWritePos{0};
@@ -130,6 +138,7 @@ private:
     std::atomic<float> mNoiseGateThreshold{0.0f};
     std::atomic<float> mBandGains[5];
     std::atomic<float> mMasterGain{1.0f};
+    std::atomic<AudioProfile> mAudioProfile{AudioProfile::Custom};
     std::atomic<float> mCurrentVolume{0.0f};
     std::atomic<bool> mParamsChanged{true};
 
@@ -139,6 +148,10 @@ private:
     Biquad mHighPass;
     Biquad mEQBands[5];
     Biquad mVoiceFilters[2];
+
+    // Intelligent Noise Profile
+    float mNoiseProfile[NOISE_PROFILE_SIZE] = {0};
+    std::atomic<bool> mLearningNoise{false};
 
     float mVisData[VIS_BINS] = {0};
     std::mutex mVisMutex;
