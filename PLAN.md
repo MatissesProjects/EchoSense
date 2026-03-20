@@ -64,6 +64,11 @@ EchoSense is an Android-first application designed to act as an intelligent, con
 * [ ] Build the UI for viewing past notes.
 * [ ] *The Wireless Test:* Introduce the Pixel Buds Pro 2 and attempt to apply the Phase 1 DSP code to the Bluetooth LE Audio stream, optimizing buffer sizes to mitigate the newly introduced latency.
 
+### Phase 5: Intelligent Scene Awareness
+* [ ] **Adaptive Scene Detection:** Automatically switch to "Music/Quiet" when ambient noise is detected and "Voice" when speech harmonics are identified.
+* [ ] **Priority-Based Profiles:** Implement a hierarchy (Speech > Ambient > Music) for automated profile transitions.
+* [ ] **Environmental Fingerprinting:** Use FFT data to create and recognize unique acoustic signatures of different spaces.
+
 ## 6. Known Risks & Mitigations
 1.  **Audio Stream Collisions:** Android limits how many apps/services can access the mic simultaneously. Mitigated by carefully managing the `AudioRecord` lifecycle and building a robust internal audio mixer.
 2.  **Battery Drain:** Mitigated by offering a "Passive Mode" (audio boost only) and an "Active Mode" (audio + transcription + AI).
