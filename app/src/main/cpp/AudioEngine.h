@@ -104,6 +104,7 @@ public:
 
     void setInputSource(InputSource source);
     void setInputDevice(int32_t deviceId);
+    void setRemoteGain(float gain);
     void writeRemoteAudio(const float* data, int32_t numFrames);
 
     void setPreAmpGain(float gain);
@@ -128,6 +129,7 @@ private:
     
     std::atomic<InputSource> mInputSource{InputSource::Default};
     std::atomic<int32_t> mInputDeviceId{oboe::kUnspecified};
+    std::atomic<float> mRemoteGain{2.0f};
 
     float mRemoteBuffer[REMOTE_BUFFER_SIZE] = {0};
     std::atomic<int32_t> mRemoteReadPos{0};

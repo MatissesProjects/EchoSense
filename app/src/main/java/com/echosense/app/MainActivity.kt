@@ -133,12 +133,29 @@ class MainActivity : AppCompatActivity() {
                     val phoneMic = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS).find { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
                     phoneMic?.let { setInputDevice(it.id) }
                     setInputSource(1)
+                    binding.layoutWatchGain.visibility = View.GONE
                 }
-                R.id.rbMicWatch -> setInputSource(2)
-                else -> { setInputDevice(-1); setInputSource(0) }
+                R.id.rbMicWatch -> {
+                    setInputSource(2)
+                    binding.layoutWatchGain.visibility = View.VISIBLE
+                }
+                else -> { 
+                    setInputDevice(-1)
+                    setInputSource(0)
+                    binding.layoutWatchGain.visibility = View.GONE
+                }
             }
             restartEngineIfRunning()
         }
+
+        binding.seekBarWatchGain.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
+                // 0-100 maps to 0.0x to 5.0x gain
+                setRemoteGain(p / 20.0f) 
+            }
+            override fun onStartTrackingTouch(s: SeekBar?) {}
+            override fun onStopTrackingTouch(s: SeekBar?) {}
+        })
 
         binding.swBluetoothAnc.setOnCheckedChangeListener { _, isChecked ->
             val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -292,6 +309,7 @@ class MainActivity : AppCompatActivity() {
     external fun isAudioEngineRunning(): Boolean
     external fun setInputSource(source: Int)
     external fun setInputDevice(deviceId: Int)
+    external fun setRemoteGain(gain: Float)
     external fun writeRemoteAudio(data: FloatArray)
     external fun setPreAmpGain(gain: Float)
     external fun setVoiceBoost(gainDb: Float)

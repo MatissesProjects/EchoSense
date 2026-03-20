@@ -66,6 +66,7 @@ void AudioEngine::stop() {
 
 void AudioEngine::setInputSource(InputSource source) { mInputSource.store(source); }
 void AudioEngine::setInputDevice(int32_t deviceId) { mInputDeviceId.store(deviceId); }
+void AudioEngine::setRemoteGain(float gain) { mRemoteGain.store(gain); }
 
 void AudioEngine::writeRemoteAudio(const float* data, int32_t numFrames) {
     for (int i = 0; i < numFrames; ++i) {
@@ -202,9 +203,10 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
     if (mParamsChanged.load()) updateFilters();
 
     if (mInputSource.load() == InputSource::Watch) {
+        float remoteGain = mRemoteGain.load();
         for (int i = 0; i < numFrames; ++i) {
             if (mRemoteReadPos != mRemoteWritePos) {
-                outputBuffer[i] = mRemoteBuffer[mRemoteReadPos];
+                outputBuffer[i] = mRemoteBuffer[mRemoteReadPos] * remoteGain;
                 mRemoteReadPos = (mRemoteReadPos + 1) % REMOTE_BUFFER_SIZE;
             } else {
                 outputBuffer[i] = 0.0f;

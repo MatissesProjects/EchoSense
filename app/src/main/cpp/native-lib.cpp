@@ -44,6 +44,13 @@ Java_com_echosense_app_MainActivity_setInputDevice(JNIEnv *env, jobject /* this 
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_echosense_app_MainActivity_setRemoteGain(JNIEnv *env, jobject /* this */, jfloat gain) {
+    if (audioEngine != nullptr) {
+        audioEngine->setRemoteGain(gain);
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_echosense_app_MainActivity_writeRemoteAudio(JNIEnv *env, jobject /* this */, jfloatArray data) {
     if (audioEngine != nullptr) {
         jfloat *c_data = env->GetFloatArrayElements(data, NULL);
