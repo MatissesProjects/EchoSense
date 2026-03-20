@@ -3,10 +3,12 @@ package com.echosense.app
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.view.WindowManager
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -22,7 +24,7 @@ import java.util.Locale
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private val RECORD_AUDIO_PERMISSION_CODE = 1
+    private val PERMISSION_REQUEST_CODE = 1
     
     private val fftData = FloatArray(64)
     private val eqCurveData = FloatArray(100)
@@ -30,6 +32,7 @@ class MainActivity : AppCompatActivity() {
     private var speechRecognizer: SpeechRecognizer? = null
     private lateinit var recognizerIntent: Intent
     private var visualizerJob: Job? = null
+    private var isDimmed = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,37 +41,51 @@ class MainActivity : AppCompatActivity() {
 
         setupUI()
         setupSpeechRecognizer()
-
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), RECORD_AUDIO_PERMISSION_CODE)
-        }
+        checkPermissions()
     }
 
     override fun onResume() {
         super.onResume()
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            startAudioEngine()
+        if (hasAllPermissions()) {
             startVisualizer()
-            startListening()
-            binding.btnToggleEngine.text = "Stop Engine"
+            if (isAudioEngineRunning()) {
+                startListening()
+                binding.btnToggleEngine.text = "Stop Engine"
+            }
         }
     }
 
-    override fun onPause() {
-        super.onPause()
-        stopListening()
-        stopAudioEngine()
-        visualizerJob?.cancel()
+    private fun checkPermissions() {
+        val permissions = mutableListOf(Manifest.permission.RECORD_AUDIO)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        
+        val missing = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+
+        if (missing.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, missing.toTypedArray(), PERMISSION_REQUEST_CODE)
+        }
+    }
+
+    private fun hasAllPermissions(): Boolean {
+        var granted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            granted = granted && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        }
+        return granted
     }
 
     private fun setupUI() {
         binding.btnToggleEngine.setOnClickListener {
             if (isAudioEngineRunning()) {
-                stopAudioEngine()
+                stopService(Intent(this, EchoSenseService::class.java))
                 stopListening()
                 binding.btnToggleEngine.text = "Start Engine"
             } else {
-                startAudioEngine()
+                startForegroundService(Intent(this, EchoSenseService::class.java))
                 startListening()
                 binding.btnToggleEngine.text = "Stop Engine"
             }
@@ -79,56 +96,60 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "AI Auto-Tune Applied", Toast.LENGTH_SHORT).show()
         }
 
-        binding.seekBarPreAmp.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                setPreAmpGain(progress / 10.0f)
+        // Power Controls
+        binding.cbKeepScreenOn.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            } else {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        }
+
+        binding.btnDimScreen.setOnClickListener {
+            val params = window.attributes
+            if (!isDimmed) {
+                params.screenBrightness = 0.01f
+                binding.btnDimScreen.text = "Restore Brightness"
+                isDimmed = true
+            } else {
+                params.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                binding.btnDimScreen.text = "Dim Mode"
+                isDimmed = false
+            }
+            window.attributes = params
+        }
+
+        // Slider bindings (unchanged but ensure they work with shared engine)
+        binding.seekBarPreAmp.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { setPreAmpGain(p / 10.0f) }
+            override fun onStartTrackingTouch(s: SeekBar?) {}
+            override fun onStopTrackingTouch(s: SeekBar?) {}
         })
 
         binding.seekBarVoiceBoost.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                setVoiceBoost(progress / 5.0f)
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { setVoiceBoost(p / 5.0f) }
+            override fun onStartTrackingTouch(s: SeekBar?) {}
+            override fun onStopTrackingTouch(s: SeekBar?) {}
         })
 
         binding.seekBarMasterGain.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                setMasterGain(progress / 10.0f)
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { setMasterGain(p / 10.0f) }
+            override fun onStartTrackingTouch(s: SeekBar?) {}
+            override fun onStopTrackingTouch(s: SeekBar?) {}
         })
 
         binding.seekBarNoiseGate.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                setNoiseGateThreshold(progress / 200.0f)
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { setNoiseGateThreshold(p / 200.0f) }
+            override fun onStartTrackingTouch(s: SeekBar?) {}
+            override fun onStopTrackingTouch(s: SeekBar?) {}
         })
 
-        val eqSeekBars = listOf(
-            binding.seekBarBand1,
-            binding.seekBarBand2,
-            binding.seekBarBand3,
-            binding.seekBarBand4,
-            binding.seekBarBand5
-        )
-
+        val eqSeekBars = listOf(binding.seekBarBand1, binding.seekBarBand2, binding.seekBarBand3, binding.seekBarBand4, binding.seekBarBand5)
         eqSeekBars.forEachIndexed { index, seekBar ->
-            seekBar.max = 200
-            seekBar.progress = 100
             seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                    val gainDb = (progress - 100) * 0.12f
-                    setEqualizerBandGain(index, gainDb)
-                }
-                override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-                override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+                override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { setEqualizerBandGain(index, (p - 100) * 0.12f) }
+                override fun onStartTrackingTouch(s: SeekBar?) {}
+                override fun onStopTrackingTouch(s: SeekBar?) {}
             })
         }
     }
@@ -149,33 +170,34 @@ class MainActivity : AppCompatActivity() {
                 override fun onRmsChanged(rmsdB: Float) {}
                 override fun onBufferReceived(buffer: ByteArray?) {}
                 override fun onEndOfSpeech() {}
-                
                 override fun onError(error: Int) {
-                    if (isAudioEngineRunning()) startListening()
+                    if (isAudioEngineRunning()) {
+                        lifecycleScope.launch {
+                            delay(500) // Avoid tight loop
+                            startListening()
+                        }
+                    }
                 }
-
                 override fun onResults(results: Bundle?) {
                     val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    if (!matches.isNullOrEmpty()) {
-                        binding.tvTranscription.text = matches[0]
-                    }
+                    if (!matches.isNullOrEmpty()) binding.tvTranscription.text = matches[0]
                     if (isAudioEngineRunning()) startListening()
                 }
-
                 override fun onPartialResults(partialResults: Bundle?) {
                     val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    if (!matches.isNullOrEmpty()) {
-                        binding.tvTranscription.text = matches[0]
-                    }
+                    if (!matches.isNullOrEmpty()) binding.tvTranscription.text = matches[0]
                 }
-
                 override fun onEvent(eventType: Int, params: Bundle?) {}
             })
         }
     }
 
     private fun startListening() {
-        speechRecognizer?.startListening(recognizerIntent)
+        try {
+            speechRecognizer?.startListening(recognizerIntent)
+        } catch (e: Exception) {
+            // Speech recognizer might be busy or not ready
+        }
     }
 
     private fun stopListening() {
@@ -188,9 +210,7 @@ class MainActivity : AppCompatActivity() {
             while (true) {
                 if (isAudioEngineRunning()) {
                     val volume = getVolumeLevel()
-                    val progress = (volume * 500).toInt().coerceIn(0, 100)
-                    binding.progressBarVolume.progress = progress
-
+                    binding.progressBarVolume.progress = (volume * 500).toInt().coerceIn(0, 100)
                     getFftData(fftData)
                     getEqCurveData(eqCurveData)
                     binding.visualizerView.updateData(fftData, eqCurveData)
@@ -202,23 +222,18 @@ class MainActivity : AppCompatActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == RECORD_AUDIO_PERMISSION_CODE) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                startAudioEngine()
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            if (hasAllPermissions()) {
                 startVisualizer()
-                startListening()
             }
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        stopAudioEngine()
         speechRecognizer?.destroy()
     }
 
-    external fun startAudioEngine()
-    external fun stopAudioEngine()
     external fun isAudioEngineRunning(): Boolean
     external fun setPreAmpGain(gain: Float)
     external fun setVoiceBoost(gainDb: Float)

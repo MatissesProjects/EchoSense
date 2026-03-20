@@ -24,7 +24,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="16dp">
+            android:layout_marginBottom="8dp">
 
             <Button
                 android:id="@+id/btnToggleEngine"
@@ -43,6 +43,31 @@
                 android:backgroundTint="#FF9800" />
         </LinearLayout>
 
+        <!-- New: Power & Continuity Controls -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <CheckBox
+                android:id="@+id/cbKeepScreenOn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Keep Screen On"
+                android:textColor="#FFFFFF"
+                android:layout_marginEnd="16dp" />
+
+            <Button
+                android:id="@+id/btnDimScreen"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Dim Mode"
+                android:textSize="12sp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:textColor="#BBBBBB" />
+        </LinearLayout>
+
         <com.echosense.app.FrequencyVisualizerView
             android:id="@+id/visualizerView"
             android:layout_width="match_parent"
@@ -50,7 +75,6 @@
             android:background="#1E1E1E"
             android:layout_marginBottom="16dp" />
 
-        <!-- Live Caption Area -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -145,7 +169,6 @@
             android:progress="0"
             android:layout_marginBottom="16dp" />
 
-        <!-- EQ Bands -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
