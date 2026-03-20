@@ -62,18 +62,25 @@ class MainActivity : AppCompatActivity() {
             audioRecord.startRecording()
 
             val messageClient = Wearable.getMessageClient(this@MainActivity)
-            val nodes = Wearable.getNodeClient(this@MainActivity).connectedNodes
-
-            while (isRecording) {
-                val read = audioRecord.read(data, 0, bufferSize)
-                if (read > 0) {
-                    nodes.result.forEach { node ->
-                        messageClient.sendMessage(node.id, WEAR_AUDIO_PATH, data.copyOf(read))
+            
+            try {
+                val nodes = com.google.android.gms.tasks.Tasks.await(Wearable.getNodeClient(this@MainActivity).connectedNodes)
+                
+                while (isRecording) {
+                    val read = audioRecord.read(data, 0, bufferSize)
+                    if (read > 0) {
+                        val payload = data.copyOf(read)
+                        nodes.forEach { node ->
+                            messageClient.sendMessage(node.id, WEAR_AUDIO_PATH, payload)
+                        }
                     }
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                audioRecord.stop()
+                audioRecord.release()
             }
-            audioRecord.stop()
-            audioRecord.release()
         }
     }
 
