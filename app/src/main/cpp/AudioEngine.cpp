@@ -17,10 +17,13 @@ bool AudioEngine::start() {
     if (mIsRunning.load()) return true;
     oboe::AudioStreamBuilder builder;
 
-    // 1. Playback Stream (The "Clock")
+    mCurrentRampGain = 0.0f;
+    mParamsChanged.store(true);
+
+    // 1. Playback Stream (Shared Mode)
     builder.setDirection(oboe::Direction::Output);
     builder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
-    builder.setSharingMode(oboe::SharingMode::Exclusive);
+    builder.setSharingMode(oboe::SharingMode::Shared);
     builder.setUsage(oboe::Usage::VoiceCommunication);
     builder.setContentType(oboe::ContentType::Speech);
     builder.setFormat(oboe::AudioFormat::Float);
@@ -30,12 +33,12 @@ bool AudioEngine::start() {
     if (builder.openStream(&mPlaybackStream) != oboe::Result::OK) return false;
     mSampleRate = (float) mPlaybackStream->getSampleRate();
 
-    // 2. Recording Stream (Polled)
+    // 2. Recording Stream (Shared Mode)
     oboe::AudioStreamBuilder recBuilder;
     recBuilder.setDirection(oboe::Direction::Input);
     recBuilder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
-    recBuilder.setSharingMode(oboe::SharingMode::Exclusive);
-    recBuilder.setInputPreset(oboe::InputPreset::Unprocessed);
+    recBuilder.setSharingMode(oboe::SharingMode::Shared);
+    recBuilder.setInputPreset(oboe::InputPreset::VoiceRecognition);
     recBuilder.setDataCallback(nullptr);
     recBuilder.setSampleRate((int32_t)mSampleRate);
     recBuilder.setChannelCount(1);
@@ -58,12 +61,17 @@ bool AudioEngine::start() {
 void AudioEngine::stop() {
     if (!mIsRunning.load()) return;
     mIsRunning.store(false);
-    if (mRecordingStream) mRecordingStream->stop();
-    if (mPlaybackStream) mPlaybackStream->stop();
-    if (mRecordingStream) mRecordingStream->close();
-    if (mPlaybackStream) mPlaybackStream->close();
-    mRecordingStream = nullptr;
-    mPlaybackStream = nullptr;
+    
+    if (mRecordingStream) {
+        mRecordingStream->stop();
+        mRecordingStream->close();
+        mRecordingStream = nullptr;
+    }
+    if (mPlaybackStream) {
+        mPlaybackStream->stop();
+        mPlaybackStream->close();
+        mPlaybackStream = nullptr;
+    }
 }
 
 void AudioEngine::setPreAmpGain(float gain) { mPreAmpGain.store(gain); }
@@ -86,6 +94,8 @@ void AudioEngine::updateFilters() {
 }
 
 inline float AudioEngine::processSample(float sample) {
+    if (mCurrentRampGain < 1.0f) mCurrentRampGain += mRampStep;
+    
     float out = sample * mPreAmpGain.load();
     if (std::abs(out) < mNoiseGateThreshold.load()) return 0.0f;
     out = mHighPass.process(out);
@@ -99,7 +109,7 @@ inline float AudioEngine::processSample(float sample) {
     for (int i = 0; i < 5; ++i) eqPath = mEQBands[i].process(eqPath);
     
     out = eqPath + (voicePath * voiceGain);
-    out *= mMasterGain.load();
+    out *= mMasterGain.load() * mCurrentRampGain;
     return std::clamp(out, -1.0f, 1.0f);
 }
 
@@ -116,7 +126,7 @@ void AudioEngine::updateVisualization(const float* data, int numFrames) {
 
 void AudioEngine::getFftData(float* output, int size) {
     std::lock_guard<std::mutex> lock(mVisMutex);
-    int copySize = std::min(VIS_BINS, size);
+    int copySize = std::min((int)VIS_BINS, size);
     std::copy(mVisData, mVisData + copySize, output);
 }
 
@@ -145,11 +155,18 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
     
     if (mParamsChanged.load()) updateFilters();
 
-    auto result = mRecordingStream->read(outputBuffer, numFrames, 0);
-    int32_t framesRead = result.value();
-
-    if (framesRead < numFrames) {
-        for (int i = framesRead; i < numFrames; ++i) outputBuffer[i] = 0.0f;
+    if (mRecordingStream) {
+        auto result = mRecordingStream->read(outputBuffer, numFrames, 0);
+        if (result) {
+            int32_t framesRead = result.value();
+            if (framesRead < numFrames) {
+                for (int i = framesRead; i < numFrames; ++i) outputBuffer[i] = 0.0f;
+            }
+        } else {
+            for (int i = 0; i < numFrames; ++i) outputBuffer[i] = 0.0f;
+        }
+    } else {
+        for (int i = 0; i < numFrames; ++i) outputBuffer[i] = 0.0f;
     }
 
     for (int i = 0; i < numFrames; ++i) {

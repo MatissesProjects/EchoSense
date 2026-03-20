@@ -14,6 +14,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.echosense.app.databinding.ActivityMainBinding
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -23,11 +24,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private val RECORD_AUDIO_PERMISSION_CODE = 1
     
-    private val fftData = FloatArray(512)
+    private val fftData = FloatArray(64)
     private val eqCurveData = FloatArray(100)
 
     private var speechRecognizer: SpeechRecognizer? = null
     private lateinit var recognizerIntent: Intent
+    private var visualizerJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,20 +41,35 @@ class MainActivity : AppCompatActivity() {
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), RECORD_AUDIO_PERMISSION_CODE)
-        } else {
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             startAudioEngine()
             startVisualizer()
             startListening()
+            binding.btnToggleEngine.text = "Stop Engine"
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        stopListening()
+        stopAudioEngine()
+        visualizerJob?.cancel()
     }
 
     private fun setupUI() {
         binding.btnToggleEngine.setOnClickListener {
             if (isAudioEngineRunning()) {
                 stopAudioEngine()
+                stopListening()
                 binding.btnToggleEngine.text = "Start Engine"
             } else {
                 startAudioEngine()
+                startListening()
                 binding.btnToggleEngine.text = "Stop Engine"
             }
         }
@@ -123,7 +140,6 @@ class MainActivity : AppCompatActivity() {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                // Prefer offline recognition for privacy and low latency
                 putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
             }
 
@@ -135,7 +151,6 @@ class MainActivity : AppCompatActivity() {
                 override fun onEndOfSpeech() {}
                 
                 override fun onError(error: Int) {
-                    // Restart listening on error (e.g. timeout)
                     if (isAudioEngineRunning()) startListening()
                 }
 
@@ -144,7 +159,7 @@ class MainActivity : AppCompatActivity() {
                     if (!matches.isNullOrEmpty()) {
                         binding.tvTranscription.text = matches[0]
                     }
-                    startListening() // Keep listening
+                    if (isAudioEngineRunning()) startListening()
                 }
 
                 override fun onPartialResults(partialResults: Bundle?) {
@@ -163,8 +178,13 @@ class MainActivity : AppCompatActivity() {
         speechRecognizer?.startListening(recognizerIntent)
     }
 
+    private fun stopListening() {
+        speechRecognizer?.stopListening()
+    }
+
     private fun startVisualizer() {
-        lifecycleScope.launch {
+        visualizerJob?.cancel()
+        visualizerJob = lifecycleScope.launch {
             while (true) {
                 if (isAudioEngineRunning()) {
                     val volume = getVolumeLevel()

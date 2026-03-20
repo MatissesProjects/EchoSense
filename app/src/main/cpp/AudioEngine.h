@@ -114,6 +114,10 @@ private:
     std::atomic<float> mCurrentVolume{0.0f};
     std::atomic<bool> mParamsChanged{true};
 
+    // Soft-start gain
+    float mCurrentRampGain = 0.0f;
+    const float mRampStep = 0.001f; // ~100ms ramp at 48k
+
     Biquad mHighPass;
     Biquad mEQBands[5];
     Biquad mVoiceFilters[2];
