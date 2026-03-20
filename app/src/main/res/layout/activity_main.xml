@@ -43,7 +43,40 @@
                 android:backgroundTint="#FF9800" />
         </LinearLayout>
 
-        <!-- New: Power & Continuity Controls -->
+        <!-- Mic Selection -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Microphone Source:"
+                android:textColor="#FFFFFF"
+                android:layout_marginEnd="12dp" />
+            <RadioGroup
+                android:id="@+id/rgMicSource"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <RadioButton
+                    android:id="@+id/rbMicAuto"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Auto"
+                    android:textColor="#FFFFFF"
+                    android:checked="true" />
+                <RadioButton
+                    android:id="@+id/rbMicPhone"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Phone"
+                    android:textColor="#FFFFFF" />
+            </RadioGroup>
+        </LinearLayout>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

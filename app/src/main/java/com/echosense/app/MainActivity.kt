@@ -1,8 +1,11 @@
 package com.echosense.app
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
 import android.speech.RecognitionListener
@@ -96,6 +99,24 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "AI Auto-Tune Applied", Toast.LENGTH_SHORT).show()
         }
 
+        // Mic Selection Logic
+        binding.rgMicSource.setOnCheckedChangeListener { _, checkedId ->
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (checkedId == R.id.rbMicPhone) {
+                // Find built-in mic
+                val devices = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS)
+                val phoneMic = devices.find { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
+                phoneMic?.let {
+                    setInputDevice(it.id)
+                    restartEngineIfRunning()
+                }
+            } else {
+                // Return to auto/unspecified
+                setInputDevice(-1) // kUnspecified
+                restartEngineIfRunning()
+            }
+        }
+
         // Power Controls
         binding.cbKeepScreenOn.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
@@ -119,7 +140,7 @@ class MainActivity : AppCompatActivity() {
             window.attributes = params
         }
 
-        // Slider bindings (unchanged but ensure they work with shared engine)
+        // Sliders
         binding.seekBarPreAmp.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { setPreAmpGain(p / 10.0f) }
             override fun onStartTrackingTouch(s: SeekBar?) {}
@@ -154,6 +175,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun restartEngineIfRunning() {
+        if (isAudioEngineRunning()) {
+            stopService(Intent(this, EchoSenseService::class.java))
+            startForegroundService(Intent(this, EchoSenseService::class.java))
+        }
+    }
+
     private fun setupSpeechRecognizer() {
         if (SpeechRecognizer.isRecognitionAvailable(this)) {
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
@@ -173,7 +201,7 @@ class MainActivity : AppCompatActivity() {
                 override fun onError(error: Int) {
                     if (isAudioEngineRunning()) {
                         lifecycleScope.launch {
-                            delay(500) // Avoid tight loop
+                            delay(500)
                             startListening()
                         }
                     }
@@ -195,9 +223,7 @@ class MainActivity : AppCompatActivity() {
     private fun startListening() {
         try {
             speechRecognizer?.startListening(recognizerIntent)
-        } catch (e: Exception) {
-            // Speech recognizer might be busy or not ready
-        }
+        } catch (e: Exception) {}
     }
 
     private fun stopListening() {
@@ -235,6 +261,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     external fun isAudioEngineRunning(): Boolean
+    external fun setInputDevice(deviceId: Int)
     external fun setPreAmpGain(gain: Float)
     external fun setVoiceBoost(gainDb: Float)
     external fun setNoiseGateThreshold(threshold: Float)

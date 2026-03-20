@@ -87,6 +87,7 @@ public:
     void stop();
     bool isRunning() const { return mIsRunning.load(); }
 
+    void setInputDevice(int32_t deviceId);
     void setPreAmpGain(float gain);
     void setVoiceBoost(float gainDb);
     void setNoiseGateThreshold(float threshold);
@@ -105,6 +106,8 @@ private:
     oboe::AudioStream *mPlaybackStream = nullptr;
     std::atomic<bool> mIsRunning{false};
     float mSampleRate = 48000.0f;
+    
+    std::atomic<int32_t> mInputDeviceId{oboe::kUnspecified};
 
     std::atomic<float> mPreAmpGain{1.0f};
     std::atomic<float> mVoiceBoostDb{0.0f};
@@ -114,9 +117,8 @@ private:
     std::atomic<float> mCurrentVolume{0.0f};
     std::atomic<bool> mParamsChanged{true};
 
-    // Soft-start gain
     float mCurrentRampGain = 0.0f;
-    const float mRampStep = 0.001f; // ~100ms ramp at 48k
+    const float mRampStep = 0.001f;
 
     Biquad mHighPass;
     Biquad mEQBands[5];

@@ -55,7 +55,7 @@ EchoSense is an Android-first application designed to act as an intelligent, con
 * [ ] Implement a "Wrist Raise to Listen" prototype.
 
 ### Phase 3: Intelligence & Transcription
-* [ ] Integrate on-device Speech-to-Text.
+* [x] Integrate on-device Speech-to-Text.
 * [ ] Feed the filtered DSP audio into the transcription engine.
 * [ ] Implement Google AICore (Gemini Nano) to summarize the resulting text.
 

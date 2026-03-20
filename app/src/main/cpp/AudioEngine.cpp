@@ -20,7 +20,7 @@ bool AudioEngine::start() {
     mCurrentRampGain = 0.0f;
     mParamsChanged.store(true);
 
-    // 1. Playback Stream (Shared Mode)
+    // 1. Playback Stream
     builder.setDirection(oboe::Direction::Output);
     builder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
     builder.setSharingMode(oboe::SharingMode::Shared);
@@ -33,7 +33,7 @@ bool AudioEngine::start() {
     if (builder.openStream(&mPlaybackStream) != oboe::Result::OK) return false;
     mSampleRate = (float) mPlaybackStream->getSampleRate();
 
-    // 2. Recording Stream (Shared Mode)
+    // 2. Recording Stream
     oboe::AudioStreamBuilder recBuilder;
     recBuilder.setDirection(oboe::Direction::Input);
     recBuilder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
@@ -43,6 +43,12 @@ bool AudioEngine::start() {
     recBuilder.setSampleRate((int32_t)mSampleRate);
     recBuilder.setChannelCount(1);
     recBuilder.setFormat(oboe::AudioFormat::Float);
+    
+    // Set requested device ID
+    int32_t deviceId = mInputDeviceId.load();
+    if (deviceId != oboe::kUnspecified) {
+        recBuilder.setDeviceId(deviceId);
+    }
 
     if (recBuilder.openStream(&mRecordingStream) != oboe::Result::OK) {
         mPlaybackStream->close();
@@ -72,6 +78,10 @@ void AudioEngine::stop() {
         mPlaybackStream->close();
         mPlaybackStream = nullptr;
     }
+}
+
+void AudioEngine::setInputDevice(int32_t deviceId) {
+    mInputDeviceId.store(deviceId);
 }
 
 void AudioEngine::setPreAmpGain(float gain) { mPreAmpGain.store(gain); }

@@ -30,6 +30,13 @@ Java_com_echosense_app_MainActivity_isAudioEngineRunning(JNIEnv *env, jobject /*
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_echosense_app_MainActivity_setInputDevice(JNIEnv *env, jobject /* this */, jint deviceId) {
+    if (audioEngine != nullptr) {
+        audioEngine->setInputDevice(deviceId);
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_echosense_app_MainActivity_setPreAmpGain(JNIEnv *env, jobject /* this */, jfloat gain) {
     if (audioEngine != nullptr) {
         audioEngine->setPreAmpGain(gain);
