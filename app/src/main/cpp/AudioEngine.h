@@ -144,6 +144,8 @@ private:
 
     float mCurrentRampGain = 0.0f;
     const float mRampStep = 0.001f;
+    int32_t mGateHoldCounter = 0;
+    const int32_t mGateHoldFrames = 2400; // ~50ms at 48kHz
 
     Biquad mHighPass;
     Biquad mEQBands[5];

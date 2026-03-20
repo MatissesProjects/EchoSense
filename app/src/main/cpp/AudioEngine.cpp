@@ -130,10 +130,16 @@ inline float AudioEngine::processSample(float sample) {
 
     float out = sample * mPreAmpGain.load();
 
-    // Improved Noise Gate with soft knee
+    // Improved Noise Gate with temporal hold (hysteresis)
     float absOut = std::abs(out);
     float threshold = mNoiseGateThreshold.load();
-    if (absOut < threshold) return 0.0f;
+    if (absOut > threshold) {
+        mGateHoldCounter = mGateHoldFrames;
+    } else if (mGateHoldCounter > 0) {
+        mGateHoldCounter--;
+    }
+
+    if (mGateHoldCounter <= 0) return 0.0f;
 
     out = mHighPass.process(out);
 
