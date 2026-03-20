@@ -51,15 +51,17 @@ EchoSense is an Android-first application designed to act as an intelligent, con
 ### Phase 2: Multi-Mic Array & WearOS Link
 * [x] Implement `AudioManager` routing to allow switching between the Phone Mic and the Headset Mic via the UI.
 * [x] Develop WearOS companion app.
-* [x] Setup WearOS Data Layer / Audio streaming to send watch microphone data to the phone.
+* [ ] **WearOS Data Stability:** Resolve `ChannelClient` streaming issues (Currently tabled).
 * [x] Implement DSP Serial Routing, Profiles (Voice/Music/TV), and Noise Gate Hysteresis.
+* [x] **Persistent Customization:** Implement Manual EQ offsets that persist across profile changes.
 
 ### Phase 3: Intelligence & Transcription
 * [x] Integrate on-device Speech-to-Text.
 * [x] Feed the filtered DSP audio into the transcription engine.
 * [ ] Implement Google AICore (Gemini Nano) to summarize the resulting text.
 
-### Phase 4: Memory Database & Wireless Expansion
+### Phase 4: Stabilization & Memory
+* [ ] **Sensor Fusion Stabilization:** Debug and fix WearOS 16kHz->48kHz resampling and streaming data flow.
 * [ ] Set up the Room Database for profiles and conversational history.
 * [ ] Build the UI for viewing past notes.
 * [ ] *The Wireless Test:* Introduce the Pixel Buds Pro 2 and attempt to apply the Phase 1 DSP code to the Bluetooth LE Audio stream, optimizing buffer sizes to mitigate the newly introduced latency.

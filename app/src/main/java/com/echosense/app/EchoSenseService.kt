@@ -6,22 +6,39 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import com.google.android.gms.wearable.MessageClient
-import com.google.android.gms.wearable.MessageEvent
+import com.google.android.gms.wearable.ChannelClient
+import com.google.android.gms.wearable.ChannelClient.Channel
 import com.google.android.gms.wearable.Wearable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-class EchoSenseService : Service(), MessageClient.OnMessageReceivedListener {
+class EchoSenseService : Service() {
 
     private val CHANNEL_ID = "EchoSenseServiceChannel"
     private val NOTIFICATION_ID = 1
-    private val WEAR_AUDIO_PATH = "/audio_stream"
+    private val WEAR_AUDIO_CHANNEL = "/audio_stream_channel"
+
+    private lateinit var channelClient: ChannelClient
+    private var channelJob: Job? = null
+
+    private val channelCallback = object : ChannelClient.ChannelCallback() {
+        override fun onChannelOpened(channel: Channel) {
+            if (channel.path == WEAR_AUDIO_CHANNEL) {
+                receiveAudioStream(channel)
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        Wearable.getMessageClient(this).addListener(this)
+        channelClient = Wearable.getChannelClient(this)
+        channelClient.registerChannelCallback(channelCallback)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -33,7 +50,8 @@ class EchoSenseService : Service(), MessageClient.OnMessageReceivedListener {
         val notification = createNotification()
         startForeground(NOTIFICATION_ID, notification)
         
-        startAudioEngine()
+        AudioEngineLib.startAudioEngine()
+        AudioEngineLib.restoreSettings(this)
         
         return START_STICKY
     }
@@ -41,19 +59,41 @@ class EchoSenseService : Service(), MessageClient.OnMessageReceivedListener {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        Wearable.getMessageClient(this).removeListener(this)
-        stopAudioEngine()
+        channelClient.unregisterChannelCallback(channelCallback)
+        channelJob?.cancel()
+        AudioEngineLib.stopAudioEngine()
         super.onDestroy()
     }
 
-    override fun onMessageReceived(messageEvent: MessageEvent) {
-        if (messageEvent.path == WEAR_AUDIO_PATH) {
-            val pcmData = messageEvent.data
-            val shortBuffer = ByteBuffer.wrap(pcmData).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
-            val floatArray = FloatArray(shortBuffer.remaining())
-            for (i in floatArray.indices) floatArray[i] = shortBuffer.get().toFloat() / 32768.0f
-            writeRemoteAudio(floatArray)
+    private fun receiveAudioStream(channel: Channel) {
+        channelJob?.cancel()
+        channelJob = CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val inputStream = channelClient.getInputStream(channel).await()
+                val buffer = ByteArray(2048)
+                val shortArray = ShortArray(1024)
+                val floatArray = FloatArray(1024)
+
+                while (true) {
+                    val read = inputStream.read(buffer)
+                    if (read == -1) break
+                    
+                    val shortBuffer = ByteBuffer.wrap(buffer, 0, read).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
+                    val shortsToRead = shortBuffer.remaining()
+                    for (i in 0 until shortsToRead) {
+                        floatArray[i] = shortBuffer.get().toFloat() / 32768.0f
+                    }
+                    AudioEngineLib.writeRemoteAudio(floatArray.copyOf(shortsToRead))
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
+    }
+
+    // Helper to await Task in Coroutine
+    private suspend fun <T> com.google.android.gms.tasks.Task<T>.await(): T {
+        return com.google.android.gms.tasks.Tasks.await(this)
     }
 
     private fun createNotification(): Notification {
@@ -83,17 +123,6 @@ class EchoSenseService : Service(), MessageClient.OnMessageReceivedListener {
             )
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(serviceChannel)
-        }
-    }
-
-    // JNI calls
-    private external fun startAudioEngine()
-    private external fun stopAudioEngine()
-    private external fun writeRemoteAudio(data: FloatArray)
-
-    companion object {
-        init {
-            System.loadLibrary("echosense_native")
         }
     }
 }

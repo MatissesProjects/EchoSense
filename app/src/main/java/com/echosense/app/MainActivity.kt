@@ -20,19 +20,15 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.echosense.app.databinding.ActivityMainBinding
-import com.google.android.gms.wearable.MessageClient
-import com.google.android.gms.wearable.MessageEvent
-import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private lateinit var settingsManager: AudioSettingsManager
     private val PERMISSION_REQUEST_CODE = 1
     
     private val fftData = FloatArray(64)
@@ -43,14 +39,14 @@ class MainActivity : AppCompatActivity() {
     private var visualizerJob: Job? = null
     private var isDimmed = false
 
-    private val WEAR_AUDIO_PATH = "/audio_stream"
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        settingsManager = AudioSettingsManager(this)
 
         setupUI()
+        restoreUiFromSettings()
         setupSpeechRecognizer()
         checkPermissions()
     }
@@ -59,16 +55,11 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         if (hasAllPermissions()) {
             startVisualizer()
-            if (isAudioEngineRunning()) {
+            if (AudioEngineLib.isAudioEngineRunning()) {
                 startListening()
                 binding.btnToggleEngine.text = "Stop Engine"
             }
         }
-        updateBluetoothUi()
-    }
-
-    override fun onPause() {
-        super.onPause()
         updateBluetoothUi()
     }
 
@@ -92,6 +83,40 @@ class MainActivity : AppCompatActivity() {
         return granted
     }
 
+    private fun restoreUiFromSettings() {
+        binding.seekBarPreAmp.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_PRE_AMP, 1.0f) * 10).toInt()
+        binding.seekBarVoiceBoost.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_VOICE_BOOST, 0.0f) / 0.3f).toInt()
+        binding.seekBarMasterGain.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_MASTER_GAIN, 1.0f) * 10).toInt()
+        binding.seekBarNoiseGate.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_NOISE_GATE, 0.0f) * 200).toInt()
+        binding.seekBarWatchGain.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_WATCH_GAIN, 2.0f) * 20).toInt()
+        
+        val profile = settingsManager.getInt(AudioSettingsManager.KEY_PROFILE, 3)
+        when (profile) {
+            0 -> binding.chipGroupProfile.check(R.id.chipProfileVoice)
+            1 -> binding.chipGroupProfile.check(R.id.chipProfileMusic)
+            2 -> binding.chipGroupProfile.check(R.id.chipProfileTV)
+            else -> binding.chipGroupProfile.check(R.id.chipProfileCustom)
+        }
+
+        val source = settingsManager.getInt(AudioSettingsManager.KEY_MIC_SOURCE, 0)
+        when (source) {
+            1 -> binding.rbMicPhone.isChecked = true
+            2 -> {
+                binding.rbMicWatch.isChecked = true
+                binding.layoutWatchGain.visibility = View.VISIBLE
+            }
+            else -> binding.rbMicAuto.isChecked = true
+        }
+
+        binding.swSensorFusion.isChecked = settingsManager.prefs.getBoolean("sensor_fusion", false)
+
+        binding.seekBarBand1.progress = (settingsManager.getFloat("band_0", 0.0f) / 0.24f + 100).toInt()
+        binding.seekBarBand2.progress = (settingsManager.getFloat("band_1", 0.0f) / 0.24f + 100).toInt()
+        binding.seekBarBand3.progress = (settingsManager.getFloat("band_2", 0.0f) / 0.24f + 100).toInt()
+        binding.seekBarBand4.progress = (settingsManager.getFloat("band_3", 0.0f) / 0.24f + 100).toInt()
+        binding.seekBarBand5.progress = (settingsManager.getFloat("band_4", 0.0f) / 0.24f + 100).toInt()
+    }
+
     private fun setupUI() {
         binding.btnExitApp.setOnClickListener {
             stopService(Intent(this, EchoSenseService::class.java))
@@ -100,7 +125,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnToggleEngine.setOnClickListener {
-            if (isAudioEngineRunning()) {
+            if (AudioEngineLib.isAudioEngineRunning()) {
                 stopService(Intent(this, EchoSenseService::class.java))
                 stopListening()
                 binding.btnToggleEngine.text = "Start Engine"
@@ -112,50 +137,60 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnAutoTune.setOnClickListener {
-            autoTune()
+            AudioEngineLib.autoTune()
             binding.chipGroupProfile.check(R.id.chipProfileCustom)
             Toast.makeText(this, "AI Adaptive Tuning Applied", Toast.LENGTH_SHORT).show()
         }
 
         binding.chipGroupProfile.setOnCheckedChangeListener { _, checkedId ->
-            when (checkedId) {
-                R.id.chipProfileVoice -> setProfile(0)
-                R.id.chipProfileMusic -> setProfile(1)
-                R.id.chipProfileTV -> setProfile(2)
-                R.id.chipProfileCustom -> setProfile(3)
+            val p = when (checkedId) {
+                R.id.chipProfileVoice -> 0
+                R.id.chipProfileMusic -> 1
+                R.id.chipProfileTV -> 2
+                else -> 3
             }
+            AudioEngineLib.setProfile(p)
+            settingsManager.saveInt(AudioSettingsManager.KEY_PROFILE, p)
         }
 
         binding.rgMicSource.setOnCheckedChangeListener { _, checkedId ->
-            when (checkedId) {
+            val source = when (checkedId) {
                 R.id.rbMicPhone -> {
                     val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
                     val phoneMic = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS).find { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
-                    phoneMic?.let { setInputDevice(it.id) }
-                    setInputSource(1)
+                    phoneMic?.let { AudioEngineLib.setInputDevice(it.id) }
                     binding.layoutWatchGain.visibility = View.GONE
+                    1
                 }
                 R.id.rbMicWatch -> {
-                    setInputSource(2)
                     binding.layoutWatchGain.visibility = View.VISIBLE
+                    2
                 }
                 else -> { 
-                    setInputDevice(-1)
-                    setInputSource(0)
+                    AudioEngineLib.setInputDevice(-1)
                     binding.layoutWatchGain.visibility = View.GONE
+                    0
                 }
             }
+            AudioEngineLib.setInputSource(source)
+            settingsManager.saveInt(AudioSettingsManager.KEY_MIC_SOURCE, source)
             restartEngineIfRunning()
         }
 
         binding.seekBarWatchGain.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
-                // 0-100 maps to 0.0x to 5.0x gain
-                setRemoteGain(p / 20.0f) 
+                val gain = p / 20.0f
+                AudioEngineLib.setRemoteGain(gain) 
+                settingsManager.saveFloat(AudioSettingsManager.KEY_WATCH_GAIN, gain)
             }
             override fun onStartTrackingTouch(s: SeekBar?) {}
             override fun onStopTrackingTouch(s: SeekBar?) {}
         })
+
+        binding.swSensorFusion.setOnCheckedChangeListener { _, isChecked ->
+            AudioEngineLib.setSensorFusion(isChecked)
+            settingsManager.prefs.edit().putBoolean("sensor_fusion", isChecked).apply()
+        }
 
         binding.swBluetoothAnc.setOnCheckedChangeListener { _, isChecked ->
             val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -183,41 +218,52 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.seekBarPreAmp.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { setPreAmpGain(p / 10.0f) }
+            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
+                val gain = p / 10.0f
+                AudioEngineLib.setPreAmpGain(gain)
+                settingsManager.saveFloat(AudioSettingsManager.KEY_PRE_AMP, gain)
+            }
             override fun onStartTrackingTouch(s: SeekBar?) {}
             override fun onStopTrackingTouch(s: SeekBar?) {}
         })
 
         binding.seekBarVoiceBoost.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
-                // Scale 0-100 to 0.0-30.0 dB for powerful AI boost
-                setVoiceBoost(p * 0.3f) 
+                val gain = p * 0.3f
+                AudioEngineLib.setVoiceBoost(gain) 
+                settingsManager.saveFloat(AudioSettingsManager.KEY_VOICE_BOOST, gain)
             }
             override fun onStartTrackingTouch(s: SeekBar?) {}
             override fun onStopTrackingTouch(s: SeekBar?) {}
         })
 
         binding.seekBarMasterGain.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { setMasterGain(p / 10.0f) }
+            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
+                val gain = p / 10.0f
+                AudioEngineLib.setMasterGain(gain) 
+                settingsManager.saveFloat(AudioSettingsManager.KEY_MASTER_GAIN, gain)
+            }
             override fun onStartTrackingTouch(s: SeekBar?) {}
             override fun onStopTrackingTouch(s: SeekBar?) {}
         })
 
         binding.seekBarNoiseGate.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { setNoiseGateThreshold(p / 200.0f) }
+            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
+                val thresh = p / 200.0f
+                AudioEngineLib.setNoiseGateThreshold(thresh) 
+                settingsManager.saveFloat(AudioSettingsManager.KEY_NOISE_GATE, thresh)
+            }
             override fun onStartTrackingTouch(s: SeekBar?) {}
             override fun onStopTrackingTouch(s: SeekBar?) {}
         })
 
         val eqSeekBars = listOf(binding.seekBarBand1, binding.seekBarBand2, binding.seekBarBand3, binding.seekBarBand4, binding.seekBarBand5)
         eqSeekBars.forEachIndexed { index, seekBar ->
-            seekBar.max = 200
-            seekBar.progress = 100
             seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
-                    // Map 0-200 to -24dB to +24dB for dramatic control
                     val gainDb = (p - 100) * 0.24f
-                    setEqualizerBandGain(index, gainDb) 
+                    AudioEngineLib.setEqualizerBandGain(index, gainDb)
+                    settingsManager.saveFloat("band_$index", gainDb)
                 }
                 override fun onStartTrackingTouch(s: SeekBar?) {}
                 override fun onStopTrackingTouch(s: SeekBar?) {}
@@ -234,7 +280,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun restartEngineIfRunning() {
-        if (isAudioEngineRunning()) {
+        if (AudioEngineLib.isAudioEngineRunning()) {
             stopService(Intent(this, EchoSenseService::class.java))
             startForegroundService(Intent(this, EchoSenseService::class.java))
         }
@@ -257,14 +303,14 @@ class MainActivity : AppCompatActivity() {
                 override fun onBufferReceived(buffer: ByteArray?) {}
                 override fun onEndOfSpeech() {}
                 override fun onError(error: Int) {
-                    if (isAudioEngineRunning()) {
+                    if (AudioEngineLib.isAudioEngineRunning()) {
                         lifecycleScope.launch { delay(500); startListening() }
                     }
                 }
                 override fun onResults(results: Bundle?) {
                     val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     if (!matches.isNullOrEmpty()) binding.tvTranscription.text = matches[0]
-                    if (isAudioEngineRunning()) startListening()
+                    if (AudioEngineLib.isAudioEngineRunning()) startListening()
                 }
                 override fun onPartialResults(partialResults: Bundle?) {
                     val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
@@ -287,11 +333,11 @@ class MainActivity : AppCompatActivity() {
         visualizerJob?.cancel()
         visualizerJob = lifecycleScope.launch {
             while (true) {
-                if (isAudioEngineRunning()) {
-                    val volume = getVolumeLevel()
+                if (AudioEngineLib.isAudioEngineRunning()) {
+                    val volume = AudioEngineLib.getVolumeLevel()
                     binding.progressBarVolume.progress = (volume * 500).toInt().coerceIn(0, 100)
-                    getFftData(fftData)
-                    getEqCurveData(eqCurveData)
+                    AudioEngineLib.getFftData(fftData)
+                    AudioEngineLib.getEqCurveData(eqCurveData)
                     binding.visualizerView.updateData(fftData, eqCurveData)
                 }
                 delay(33)
@@ -303,28 +349,6 @@ class MainActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (hasAllPermissions()) startVisualizer()
-        }
-    }
-
-    external fun isAudioEngineRunning(): Boolean
-    external fun setInputSource(source: Int)
-    external fun setInputDevice(deviceId: Int)
-    external fun setRemoteGain(gain: Float)
-    external fun writeRemoteAudio(data: FloatArray)
-    external fun setPreAmpGain(gain: Float)
-    external fun setVoiceBoost(gainDb: Float)
-    external fun setNoiseGateThreshold(threshold: Float)
-    external fun setMasterGain(gain: Float)
-    external fun setProfile(profile: Int)
-    external fun setEqualizerBandGain(bandIndex: Int, gain: Float)
-    external fun getVolumeLevel(): Float
-    external fun getFftData(output: FloatArray)
-    external fun getEqCurveData(output: FloatArray)
-    external fun autoTune()
-
-    companion object {
-        init {
-            System.loadLibrary("echosense_native")
         }
     }
 }
