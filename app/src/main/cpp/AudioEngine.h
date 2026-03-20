@@ -113,6 +113,7 @@ public:
     void setEqualizerBandGain(int bandIndex, float gainDb);
     void setMasterGain(float gain);
     void setProfile(AudioProfile profile);
+    void setSensorFusion(bool enabled);
     float getVolumeLevel() const { return mCurrentVolume.load(); }
 
     void getFftData(float* output, int size);
@@ -134,13 +135,22 @@ private:
     float mRemoteBuffer[REMOTE_BUFFER_SIZE] = {0};
     std::atomic<int32_t> mRemoteReadPos{0};
     std::atomic<int32_t> mRemoteWritePos{0};
+    
+    // Resampling state (16kHz -> 48kHz)
+    float mPrevRemoteSample = 0.0f;
+    float mCurrRemoteSample = 0.0f;
+    int mResamplePhase = 0;
+
+    float getNextResampledRemoteSample();
 
     std::atomic<float> mPreAmpGain{1.0f};
     std::atomic<float> mVoiceBoostDb{0.0f};
     std::atomic<float> mNoiseGateThreshold{0.0f};
-    std::atomic<float> mBandGains[5];
+    std::atomic<float> mManualBandGains[5];
+    std::atomic<float> mProfileBandGains[5];
     std::atomic<float> mMasterGain{1.0f};
     std::atomic<AudioProfile> mAudioProfile{AudioProfile::Custom};
+    std::atomic<bool> mSensorFusionEnabled{false};
     std::atomic<float> mCurrentVolume{0.0f};
     std::atomic<bool> mParamsChanged{true};
 

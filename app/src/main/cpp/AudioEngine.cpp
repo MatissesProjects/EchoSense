@@ -6,7 +6,10 @@
 #define TAG "AudioEngine"
 
 AudioEngine::AudioEngine() {
-    for (int i = 0; i < 5; ++i) mBandGains[i].store(0.0f);
+    for (int i = 0; i < 5; ++i) {
+        mManualBandGains[i].store(0.0f);
+        mProfileBandGains[i].store(0.0f);
+    }
 }
 
 AudioEngine::~AudioEngine() {
@@ -83,42 +86,69 @@ void AudioEngine::setNoiseGateThreshold(float threshold) { mNoiseGateThreshold.s
 void AudioEngine::setMasterGain(float gain) { mMasterGain.store(gain); }
 void AudioEngine::setEqualizerBandGain(int bandIndex, float gainDb) {
     if (bandIndex >= 0 && bandIndex < 5) {
-        mBandGains[bandIndex].store(gainDb);
+        mManualBandGains[bandIndex].store(gainDb);
         mParamsChanged.store(true);
     }
 }
 
 void AudioEngine::setProfile(AudioProfile profile) {
     mAudioProfile.store(profile);
+    // Reset profile baseline
+    for (int i = 0; i < 5; ++i) mProfileBandGains[i].store(0.0f);
+    mVoiceBoostDb.store(0.0f);
+
     if (profile == AudioProfile::Voice) {
-        mBandGains[0].store(-12.0f); // Low cut
-        mBandGains[1].store(-6.0f);
-        mBandGains[2].store(3.0f);   // Speech body
-        mBandGains[3].store(8.0f);   // Clarity
-        mBandGains[4].store(-3.0f);
+        mProfileBandGains[0].store(-12.0f); // Low cut
+        mProfileBandGains[1].store(-6.0f);
+        mProfileBandGains[2].store(3.0f);   // Speech body
+        mProfileBandGains[3].store(8.0f);   // Clarity
+        mProfileBandGains[4].store(-3.0f);
         mVoiceBoostDb.store(10.0f);
     } else if (profile == AudioProfile::Music) {
-        mBandGains[0].store(4.0f);   // Bass
-        mBandGains[1].store(0.0f);
-        mBandGains[2].store(-2.0f);
-        mBandGains[3].store(2.0f);
-        mBandGains[4].store(4.0f);   // Sparkle
-        mVoiceBoostDb.store(0.0f);
+        mProfileBandGains[0].store(4.0f);   // Bass
+        mProfileBandGains[1].store(0.0f);
+        mProfileBandGains[2].store(-2.0f);
+        mProfileBandGains[3].store(2.0f);
+        mProfileBandGains[4].store(4.0f);   // Sparkle
     } else if (profile == AudioProfile::TV) {
-        mBandGains[0].store(-6.0f);
-        mBandGains[1].store(0.0f);
-        mBandGains[2].store(4.0f);
-        mBandGains[3].store(6.0f);
-        mBandGains[4].store(-4.0f);
+        mProfileBandGains[0].store(-6.0f);
+        mProfileBandGains[1].store(0.0f);
+        mProfileBandGains[2].store(4.0f);
+        mProfileBandGains[3].store(6.0f);
+        mProfileBandGains[4].store(-4.0f);
         mVoiceBoostDb.store(6.0f);
     }
     mParamsChanged.store(true);
 }
 
+void AudioEngine::setSensorFusion(bool enabled) {
+    mSensorFusionEnabled.store(enabled);
+}
+
+float AudioEngine::getNextResampledRemoteSample() {
+    if (mResamplePhase == 0) {
+        mPrevRemoteSample = mCurrRemoteSample;
+        if (mRemoteReadPos != mRemoteWritePos) {
+            mCurrRemoteSample = mRemoteBuffer[mRemoteReadPos];
+            mRemoteReadPos = (mRemoteReadPos + 1) % REMOTE_BUFFER_SIZE;
+        } else {
+            mCurrRemoteSample = 0.0f;
+        }
+    }
+    
+    float fraction = (float)(mResamplePhase) / 3.0f;
+    float interpolated = mPrevRemoteSample + fraction * (mCurrRemoteSample - mPrevRemoteSample);
+    
+    mResamplePhase = (mResamplePhase + 1) % 3;
+    return interpolated;
+}
+
 void AudioEngine::updateFilters() {
     float freqs[5] = {200.0f, 500.0f, 1500.0f, 3000.0f, 6000.0f};
-    for (int i = 0; i < 5; ++i) mEQBands[i].setPeaking(freqs[i], mSampleRate, 1.0f, mBandGains[i].load());
-    // Gentler Q for voice filters to avoid "ringing"
+    for (int i = 0; i < 5; ++i) {
+        float combinedGain = mManualBandGains[i].load() + mProfileBandGains[i].load();
+        mEQBands[i].setPeaking(freqs[i], mSampleRate, 1.0f, combinedGain);
+    }
     mVoiceFilters[0].setPeaking(700.0f, mSampleRate, 0.4f, mVoiceBoostDb.load() * 0.4f);
     mVoiceFilters[1].setPeaking(3200.0f, mSampleRate, 0.4f, mVoiceBoostDb.load() * 0.8f);
     mParamsChanged.store(false);
@@ -126,14 +156,14 @@ void AudioEngine::updateFilters() {
 
 inline float AudioEngine::processSample(float sample) {
     if (mCurrentRampGain < 1.0f) mCurrentRampGain += mRampStep;
-
     if (mLearningNoise.load()) return 0.0f;
 
     float out = sample * mPreAmpGain.load();
 
-    // Improved Noise Gate with temporal hold (hysteresis)
+    // Noise Gate Logic
     float absOut = std::abs(out);
     float threshold = mNoiseGateThreshold.load();
+    
     if (absOut > threshold) {
         mGateHoldCounter = mGateHoldFrames;
     } else if (mGateHoldCounter > 0) {
@@ -143,21 +173,13 @@ inline float AudioEngine::processSample(float sample) {
     if (mGateHoldCounter <= 0) return 0.0f;
 
     out = mHighPass.process(out);
-
-    // Serial Processing Path for better predictability
-    // 1. Voice Shaping
     out = mVoiceFilters[0].process(out);
     out = mVoiceFilters[1].process(out);
-
-    // 2. Graphic Equalizer
-    for (int i = 0; i < 5; ++i) {
-        out = mEQBands[i].process(out);
-    }
-
+    for (int i = 0; i < 5; ++i) out = mEQBands[i].process(out);
+    
     out *= mMasterGain.load() * mCurrentRampGain;
     return std::clamp(out, -1.0f, 1.0f);
 }
-
 
 void AudioEngine::updateVisualization(const float* data, int numFrames) {
     std::lock_guard<std::mutex> lock(mVisMutex);
@@ -178,23 +200,19 @@ void AudioEngine::getEqCurveData(float* output, int size) {
     for (int i = 0; i < size; ++i) {
         float freq = 20.0f * powf(1000.0f, (float)i / (float)size);
         float eqMag = mHighPass.getMagnitude(freq, mSampleRate);
-        for (int b = 0; b < 5; ++b) eqMag *= mEQBands[b].getMagnitude(freq, mSampleRate);
+        for (int b = 0; b < 5; b++) eqMag *= mEQBands[b].getMagnitude(freq, mSampleRate);
         float vMag = mVoiceFilters[0].getMagnitude(freq, mSampleRate) * mVoiceFilters[1].getMagnitude(freq, mSampleRate);
         output[i] = eqMag * vMag;
     }
 }
 
 void AudioEngine::autoTune() {
-    // Intelligent heuristic: 
-    // 1. Kill the low end (Fan)
-    // 2. Scoop the low-mids (Mud)
-    // 3. Peak the clarity (3k)
-    mBandGains[0].store(-18.0f); // Massive cut to fan rumble
-    mBandGains[1].store(-8.0f);  // Cut mud
-    mBandGains[2].store(4.0f);   // Slight speech body boost
-    mBandGains[3].store(12.0f);  // Massive clarity boost
-    mBandGains[4].store(-6.0f);  // Cut hiss
-    mVoiceBoostDb.store(15.0f);  // High AI Voice Boost
+    mManualBandGains[0].store(-18.0f);
+    mManualBandGains[1].store(-8.0f);
+    mManualBandGains[2].store(4.0f);
+    mManualBandGains[3].store(12.0f);
+    mManualBandGains[4].store(-6.0f);
+    mVoiceBoostDb.store(15.0f);
     mParamsChanged.store(true);
 }
 
@@ -202,35 +220,48 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
     float *outputBuffer = static_cast<float *>(audioData);
     if (mParamsChanged.load()) updateFilters();
 
-    if (mInputSource.load() == InputSource::Watch) {
+    float ambientRMS = 0.0f;
+    bool fusion = mSensorFusionEnabled.load();
+    InputSource source = mInputSource.load();
+
+    if (source == InputSource::Watch || fusion) {
+        float sumSq = 0;
         float remoteGain = mRemoteGain.load();
         for (int i = 0; i < numFrames; ++i) {
-            if (mRemoteReadPos != mRemoteWritePos) {
-                outputBuffer[i] = mRemoteBuffer[mRemoteReadPos] * remoteGain;
-                mRemoteReadPos = (mRemoteReadPos + 1) % REMOTE_BUFFER_SIZE;
-            } else {
-                outputBuffer[i] = 0.0f;
-            }
+            float s = getNextResampledRemoteSample() * remoteGain;
+            sumSq += s * s;
+            if (source == InputSource::Watch) outputBuffer[i] = s;
         }
-    } else {
+        ambientRMS = sqrtf(sumSq / (float)numFrames);
+    }
+
+    if (source != InputSource::Watch) {
         if (mRecordingStream) {
             auto result = mRecordingStream->read(outputBuffer, numFrames, 0);
-            if (result) {
-                int32_t framesRead = result.value();
-                if (framesRead < numFrames) {
-                    for (int i = framesRead; i < numFrames; ++i) outputBuffer[i] = 0.0f;
-                }
-            } else {
-                for (int i = 0; i < numFrames; ++i) outputBuffer[i] = 0.0f;
+            if (!result || result.value() < numFrames) {
+                int32_t start = result ? result.value() : 0;
+                for (int i = start; i < numFrames; i++) outputBuffer[i] = 0.0f;
             }
         } else {
-            for (int i = 0; i < numFrames; ++i) outputBuffer[i] = 0.0f;
+            for (int i = 0; i < numFrames; i++) outputBuffer[i] = 0.0f;
         }
+    }
+
+    // Dynamic Gate Adjustment based on Ambient
+    float baseThreshold = mNoiseGateThreshold.load();
+    if (fusion) {
+        // If ambient is high, push the gate up
+        float dynamicThresh = baseThreshold + (ambientRMS * 0.5f);
+        // We'll temporarily set the gate threshold for this block
+        mNoiseGateThreshold.store(dynamicThresh);
     }
 
     for (int i = 0; i < numFrames; ++i) {
         outputBuffer[i] = processSample(outputBuffer[i]);
     }
+
+    // Restore threshold
+    if (fusion) mNoiseGateThreshold.store(baseThreshold);
 
     updateVisualization(outputBuffer, numFrames);
     return oboe::DataCallbackResult::Continue;
