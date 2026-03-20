@@ -49,8 +49,8 @@ EchoSense is an Android-first application designed to act as an intelligent, con
 * [x] Test latency and ensure audio is perfectly synced.
 
 ### Phase 2: Multi-Mic Array & WearOS Link
-* [ ] Implement `AudioManager` routing to allow switching between the Phone Mic and the Headset Mic via the UI.
-* [ ] Develop WearOS companion app.
+* [x] Implement `AudioManager` routing to allow switching between the Phone Mic and the Headset Mic via the UI.
+* [x] Develop WearOS companion app.
 * [ ] Setup WearOS Data Layer / Audio streaming to send watch microphone data to the phone.
 * [ ] Implement a "Wrist Raise to Listen" prototype.
 

@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.view.View
 import android.view.WindowManager
 import android.widget.SeekBar
 import android.widget.Toast
@@ -19,12 +20,17 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.echosense.app.databinding.ActivityMainBinding
+import com.google.android.gms.wearable.MessageClient
+import com.google.android.gms.wearable.MessageEvent
+import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.Locale
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), MessageClient.OnMessageReceivedListener {
 
     private lateinit var binding: ActivityMainBinding
     private val PERMISSION_REQUEST_CODE = 1
@@ -37,6 +43,8 @@ class MainActivity : AppCompatActivity() {
     private var visualizerJob: Job? = null
     private var isDimmed = false
 
+    private val WEAR_AUDIO_PATH = "/audio_stream"
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -45,6 +53,8 @@ class MainActivity : AppCompatActivity() {
         setupUI()
         setupSpeechRecognizer()
         checkPermissions()
+        
+        Wearable.getMessageClient(this).addListener(this)
     }
 
     override fun onResume() {
@@ -56,12 +66,40 @@ class MainActivity : AppCompatActivity() {
                 binding.btnToggleEngine.text = "Stop Engine"
             }
         }
+        updateBluetoothUi()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        updateBluetoothUi()
+    }
+
+    override fun onDestroy() {
+        Wearable.getMessageClient(this).removeListener(this)
+        super.onDestroy()
+        speechRecognizer?.destroy()
+    }
+
+    override fun onMessageReceived(messageEvent: MessageEvent) {
+        if (messageEvent.path == WEAR_AUDIO_PATH) {
+            val pcmData = messageEvent.data
+            // Convert ByteArray (PCM 16-bit) to FloatArray for C++
+            val shortBuffer = ByteBuffer.wrap(pcmData).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
+            val floatArray = FloatArray(shortBuffer.remaining())
+            for (i in floatArray.indices) {
+                floatArray[i] = shortBuffer.get().toFloat() / 32768.0f
+            }
+            writeRemoteAudio(floatArray)
+        }
     }
 
     private fun checkPermissions() {
         val permissions = mutableListOf(Manifest.permission.RECORD_AUDIO)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
         }
         
         val missing = permissions.filter {
@@ -99,31 +137,41 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "AI Auto-Tune Applied", Toast.LENGTH_SHORT).show()
         }
 
-        // Mic Selection Logic
         binding.rgMicSource.setOnCheckedChangeListener { _, checkedId ->
-            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            if (checkedId == R.id.rbMicPhone) {
-                // Find built-in mic
-                val devices = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS)
-                val phoneMic = devices.find { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
-                phoneMic?.let {
-                    setInputDevice(it.id)
-                    restartEngineIfRunning()
+            when (checkedId) {
+                R.id.rbMicPhone -> {
+                    val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                    val phoneMic = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS).find { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
+                    phoneMic?.let { setInputDevice(it.id) }
+                    setInputSource(1) // Phone
                 }
+                R.id.rbMicWatch -> {
+                    setInputSource(2) // Watch
+                }
+                else -> {
+                    setInputDevice(-1)
+                    setInputSource(0) // Default
+                }
+            }
+            restartEngineIfRunning()
+        }
+
+        binding.swBluetoothAnc.setOnCheckedChangeListener { _, isChecked ->
+            // Note: True ANC control is often vendor-specific.
+            // Here we hint to the system we want high-quality voice/noise reduction context.
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (isChecked) {
+                audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+                Toast.makeText(this, "Requesting Wireless ANC Mode...", Toast.LENGTH_SHORT).show()
             } else {
-                // Return to auto/unspecified
-                setInputDevice(-1) // kUnspecified
-                restartEngineIfRunning()
+                audioManager.mode = AudioManager.MODE_NORMAL
             }
         }
 
         // Power Controls
         binding.cbKeepScreenOn.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked) {
-                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            } else {
-                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            }
+            if (isChecked) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
 
         binding.btnDimScreen.setOnClickListener {
@@ -175,6 +223,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun updateBluetoothUi() {
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val btConnected = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any { 
+            it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP || it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
+        }
+        binding.layoutBluetoothOpt.visibility = if (btConnected) View.VISIBLE else View.GONE
+    }
+
     private fun restartEngineIfRunning() {
         if (isAudioEngineRunning()) {
             stopService(Intent(this, EchoSenseService::class.java))
@@ -200,10 +256,7 @@ class MainActivity : AppCompatActivity() {
                 override fun onEndOfSpeech() {}
                 override fun onError(error: Int) {
                     if (isAudioEngineRunning()) {
-                        lifecycleScope.launch {
-                            delay(500)
-                            startListening()
-                        }
+                        lifecycleScope.launch { delay(500); startListening() }
                     }
                 }
                 override fun onResults(results: Bundle?) {
@@ -221,9 +274,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startListening() {
-        try {
-            speechRecognizer?.startListening(recognizerIntent)
-        } catch (e: Exception) {}
+        try { speechRecognizer?.startListening(recognizerIntent) } catch (e: Exception) {}
     }
 
     private fun stopListening() {
@@ -249,19 +300,14 @@ class MainActivity : AppCompatActivity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == PERMISSION_REQUEST_CODE) {
-            if (hasAllPermissions()) {
-                startVisualizer()
-            }
+            if (hasAllPermissions()) startVisualizer()
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        speechRecognizer?.destroy()
-    }
-
     external fun isAudioEngineRunning(): Boolean
+    external fun setInputSource(source: Int)
     external fun setInputDevice(deviceId: Int)
+    external fun writeRemoteAudio(data: FloatArray)
     external fun setPreAmpGain(gain: Float)
     external fun setVoiceBoost(gainDb: Float)
     external fun setNoiseGateThreshold(threshold: Float)

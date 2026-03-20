@@ -53,7 +53,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Microphone Source:"
+                android:text="Mic Source:"
                 android:textColor="#FFFFFF"
                 android:layout_marginEnd="12dp" />
             <RadioGroup
@@ -74,7 +74,36 @@
                     android:layout_height="wrap_content"
                     android:text="Phone"
                     android:textColor="#FFFFFF" />
+                <RadioButton
+                    android:id="@+id/rbMicWatch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Watch"
+                    android:textColor="#FFFFFF" />
             </RadioGroup>
+        </LinearLayout>
+
+        <!-- Bluetooth Optimization -->
+        <LinearLayout
+            android:id="@+id/layoutBluetoothOpt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="8dp"
+            android:visibility="visible">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Wireless ANC Mode:"
+                android:textColor="#4CAF50"
+                android:textStyle="bold"
+                android:layout_marginEnd="12dp" />
+            <Switch
+                android:id="@+id/swBluetoothAnc"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF" />
         </LinearLayout>
 
         <LinearLayout

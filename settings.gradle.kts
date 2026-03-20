@@ -14,3 +14,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "EchoSense"
 include(":app")
+include(":wear")

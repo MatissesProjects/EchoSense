@@ -44,7 +44,6 @@ bool AudioEngine::start() {
     recBuilder.setChannelCount(1);
     recBuilder.setFormat(oboe::AudioFormat::Float);
     
-    // Set requested device ID
     int32_t deviceId = mInputDeviceId.load();
     if (deviceId != oboe::kUnspecified) {
         recBuilder.setDeviceId(deviceId);
@@ -67,7 +66,6 @@ bool AudioEngine::start() {
 void AudioEngine::stop() {
     if (!mIsRunning.load()) return;
     mIsRunning.store(false);
-    
     if (mRecordingStream) {
         mRecordingStream->stop();
         mRecordingStream->close();
@@ -80,8 +78,21 @@ void AudioEngine::stop() {
     }
 }
 
+void AudioEngine::setInputSource(InputSource source) {
+    mInputSource.store(source);
+}
+
 void AudioEngine::setInputDevice(int32_t deviceId) {
     mInputDeviceId.store(deviceId);
+}
+
+void AudioEngine::writeRemoteAudio(const float* data, int32_t numFrames) {
+    for (int i = 0; i < numFrames; ++i) {
+        int nextPos = (mRemoteWritePos + 1) % REMOTE_BUFFER_SIZE;
+        if (nextPos == mRemoteReadPos) break;
+        mRemoteBuffer[mRemoteWritePos] = data[i];
+        mRemoteWritePos = nextPos;
+    }
 }
 
 void AudioEngine::setPreAmpGain(float gain) { mPreAmpGain.store(gain); }
@@ -105,19 +116,15 @@ void AudioEngine::updateFilters() {
 
 inline float AudioEngine::processSample(float sample) {
     if (mCurrentRampGain < 1.0f) mCurrentRampGain += mRampStep;
-    
     float out = sample * mPreAmpGain.load();
     if (std::abs(out) < mNoiseGateThreshold.load()) return 0.0f;
     out = mHighPass.process(out);
-    
     float voicePath = out;
     voicePath = mVoiceFilters[0].process(voicePath);
     voicePath = mVoiceFilters[1].process(voicePath);
     float voiceGain = powf(10.0f, mVoiceBoostDb.load() / 20.0f);
-    
     float eqPath = out;
     for (int i = 0; i < 5; ++i) eqPath = mEQBands[i].process(eqPath);
-    
     out = eqPath + (voicePath * voiceGain);
     out *= mMasterGain.load() * mCurrentRampGain;
     return std::clamp(out, -1.0f, 1.0f);
@@ -129,15 +136,13 @@ void AudioEngine::updateVisualization(const float* data, int numFrames) {
     for (int i = 0; i < numFrames; ++i) sumSq += data[i] * data[i];
     float rms = sqrtf(sumSq / (float)numFrames);
     mCurrentVolume.store(rms);
-
     for(int i = VIS_BINS-1; i > 0; --i) mVisData[i] = mVisData[i-1];
     mVisData[0] = rms;
 }
 
 void AudioEngine::getFftData(float* output, int size) {
     std::lock_guard<std::mutex> lock(mVisMutex);
-    int copySize = std::min((int)VIS_BINS, size);
-    std::copy(mVisData, mVisData + copySize, output);
+    std::copy(mVisData, mVisData + std::min((int)VIS_BINS, size), output);
 }
 
 void AudioEngine::getEqCurveData(float* output, int size) {
@@ -152,31 +157,38 @@ void AudioEngine::getEqCurveData(float* output, int size) {
 }
 
 void AudioEngine::autoTune() {
-    mBandGains[0].store(-10.0f);
-    mBandGains[1].store(-5.0f);
-    mBandGains[2].store(5.0f);
-    mBandGains[3].store(8.0f);
-    mVoiceBoostDb.store(10.0f);
-    mParamsChanged.store(true);
+    mBandGains[0].store(-10.0f); mBandGains[1].store(-5.0f);
+    mBandGains[2].store(5.0f); mBandGains[3].store(8.0f);
+    mVoiceBoostDb.store(10.0f); mParamsChanged.store(true);
 }
 
 oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
     float *outputBuffer = static_cast<float *>(audioData);
-    
     if (mParamsChanged.load()) updateFilters();
 
-    if (mRecordingStream) {
-        auto result = mRecordingStream->read(outputBuffer, numFrames, 0);
-        if (result) {
-            int32_t framesRead = result.value();
-            if (framesRead < numFrames) {
-                for (int i = framesRead; i < numFrames; ++i) outputBuffer[i] = 0.0f;
+    if (mInputSource.load() == InputSource::Watch) {
+        for (int i = 0; i < numFrames; ++i) {
+            if (mRemoteReadPos != mRemoteWritePos) {
+                outputBuffer[i] = mRemoteBuffer[mRemoteReadPos];
+                mRemoteReadPos = (mRemoteReadPos + 1) % REMOTE_BUFFER_SIZE;
+            } else {
+                outputBuffer[i] = 0.0f;
+            }
+        }
+    } else {
+        if (mRecordingStream) {
+            auto result = mRecordingStream->read(outputBuffer, numFrames, 0);
+            if (result) {
+                int32_t framesRead = result.value();
+                if (framesRead < numFrames) {
+                    for (int i = framesRead; i < numFrames; ++i) outputBuffer[i] = 0.0f;
+                }
+            } else {
+                for (int i = 0; i < numFrames; ++i) outputBuffer[i] = 0.0f;
             }
         } else {
             for (int i = 0; i < numFrames; ++i) outputBuffer[i] = 0.0f;
         }
-    } else {
-        for (int i = 0; i < numFrames; ++i) outputBuffer[i] = 0.0f;
     }
 
     for (int i = 0; i < numFrames; ++i) {
@@ -184,6 +196,5 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
     }
 
     updateVisualization(outputBuffer, numFrames);
-
     return oboe::DataCallbackResult::Continue;
 }

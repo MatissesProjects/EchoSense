@@ -8,6 +8,13 @@
 #include <mutex>
 
 #define VIS_BINS 64
+#define REMOTE_BUFFER_SIZE 4096
+
+enum class InputSource {
+    Default = 0,
+    Phone = 1,
+    Watch = 2
+};
 
 // Biquad Filter Structure
 struct Biquad {
@@ -87,7 +94,10 @@ public:
     void stop();
     bool isRunning() const { return mIsRunning.load(); }
 
+    void setInputSource(InputSource source);
     void setInputDevice(int32_t deviceId);
+    void writeRemoteAudio(const float* data, int32_t numFrames);
+
     void setPreAmpGain(float gain);
     void setVoiceBoost(float gainDb);
     void setNoiseGateThreshold(float threshold);
@@ -107,7 +117,13 @@ private:
     std::atomic<bool> mIsRunning{false};
     float mSampleRate = 48000.0f;
     
+    std::atomic<InputSource> mInputSource{InputSource::Default};
     std::atomic<int32_t> mInputDeviceId{oboe::kUnspecified};
+
+    // Remote (Watch) Audio Buffer
+    float mRemoteBuffer[REMOTE_BUFFER_SIZE] = {0};
+    std::atomic<int32_t> mRemoteReadPos{0};
+    std::atomic<int32_t> mRemoteWritePos{0};
 
     std::atomic<float> mPreAmpGain{1.0f};
     std::atomic<float> mVoiceBoostDb{0.0f};

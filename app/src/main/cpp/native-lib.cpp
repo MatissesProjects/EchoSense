@@ -30,9 +30,26 @@ Java_com_echosense_app_MainActivity_isAudioEngineRunning(JNIEnv *env, jobject /*
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_echosense_app_MainActivity_setInputSource(JNIEnv *env, jobject /* this */, jint source) {
+    if (audioEngine != nullptr) {
+        audioEngine->setInputSource(static_cast<InputSource>(source));
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_echosense_app_MainActivity_setInputDevice(JNIEnv *env, jobject /* this */, jint deviceId) {
     if (audioEngine != nullptr) {
         audioEngine->setInputDevice(deviceId);
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_echosense_app_MainActivity_writeRemoteAudio(JNIEnv *env, jobject /* this */, jfloatArray data) {
+    if (audioEngine != nullptr) {
+        jfloat *c_data = env->GetFloatArrayElements(data, NULL);
+        jsize len = env->GetArrayLength(data);
+        audioEngine->writeRemoteAudio(c_data, len);
+        env->ReleaseFloatArrayElements(data, c_data, JNI_ABORT);
     }
 }
 
@@ -103,5 +120,23 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_echosense_app_MainActivity_autoTune(JNIEnv *env, jobject /* this */) {
     if (audioEngine != nullptr) {
         audioEngine->autoTune();
+    }
+}
+
+// Service JNI exports
+extern "C" JNIEXPORT void JNICALL
+Java_com_echosense_app_EchoSenseService_startAudioEngine(JNIEnv *env, jobject /* this */) {
+    if (audioEngine == nullptr) {
+        audioEngine = new AudioEngine();
+    }
+    audioEngine->start();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_echosense_app_EchoSenseService_stopAudioEngine(JNIEnv *env, jobject /* this */) {
+    if (audioEngine != nullptr) {
+        audioEngine->stop();
+        delete audioEngine;
+        audioEngine = nullptr;
     }
 }
