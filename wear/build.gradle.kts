@@ -8,7 +8,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.echosense.app" // Must match phone for Data Layer sharing
+        applicationId = "com.echosense.wear"
         minSdk = 30 // WearOS 3.0+
         targetSdk = 34
         versionCode = 1

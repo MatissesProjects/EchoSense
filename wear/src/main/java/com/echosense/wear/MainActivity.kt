@@ -1,30 +1,19 @@
 package com.echosense.wear
 
 import android.Manifest
+import android.app.ActivityManager
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
-import android.media.AudioFormat
-import android.media.AudioRecord
-import android.media.MediaRecorder
+import android.os.Build
 import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import com.google.android.gms.wearable.ChannelClient
-import com.google.android.gms.wearable.Wearable
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
-import java.io.OutputStream
+import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
-
-    private var isRecording = false
-    private var recordingJob: Job? = null
-    private val WEAR_AUDIO_CHANNEL = "/audio_stream_channel"
 
     private lateinit var tvStatus: TextView
 
@@ -36,79 +25,62 @@ class MainActivity : AppCompatActivity() {
         tvStatus = findViewById<TextView>(R.id.tvWatchStatus)
 
         btnToggle.setOnClickListener {
-            if (isRecording) {
-                stopRecording()
+            if (isServiceRunning(WearSensorService::class.java)) {
+                stopSensorService()
                 btnToggle.text = "Start Ambient Collector"
-                updateStatus("Status: Idle")
+                tvStatus.text = "Status: Idle"
             } else {
                 if (checkPermissions()) {
-                    startRecording()
+                    startSensorService()
                     btnToggle.text = "Stop Collector"
-                    updateStatus("Status: Connecting...")
+                    tvStatus.text = "Status: Collector Active"
                 }
             }
         }
-    }
 
-    private fun updateStatus(text: String) {
-        runOnUiThread { tvStatus.text = text }
+        // Initial UI state
+        if (isServiceRunning(WearSensorService::class.java)) {
+            btnToggle.text = "Stop Collector"
+            tvStatus.text = "Status: Collector Active"
+        }
     }
 
     private fun checkPermissions(): Boolean {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 1)
+        val permissions = mutableListOf(Manifest.permission.RECORD_AUDIO)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        
+        val missing = permissions.filter { 
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED 
+        }
+        
+        if (missing.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, missing.toTypedArray(), 1)
             return false
         }
         return true
     }
 
-    private fun startRecording() {
-        isRecording = true
-        recordingJob = CoroutineScope(Dispatchers.IO).launch {
-            val bufferSize = AudioRecord.getMinBufferSize(16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-            val audioRecord = AudioRecord(MediaRecorder.AudioSource.MIC, 16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize)
-            
-            val data = ByteArray(bufferSize)
-            
-            val channelClient = Wearable.getChannelClient(this@MainActivity)
-            val nodeClient = Wearable.getNodeClient(this@MainActivity)
-
-            try {
-                val nodes = nodeClient.connectedNodes.await()
-                if (nodes.isEmpty()) {
-                    updateStatus("Status: No Phone Found")
-                    return@launch
-                }
-
-                val phoneNode = nodes[0] // Assuming the first connected node is the phone
-                val channel = channelClient.openChannel(phoneNode.id, WEAR_AUDIO_CHANNEL).await()
-                val outputStream = channelClient.getOutputStream(channel).await()
-
-                updateStatus("Status: Collecting Ambient...")
-                audioRecord.startRecording()
-
-                while (isRecording) {
-                    val read = audioRecord.read(data, 0, bufferSize)
-                    if (read > 0) {
-                        outputStream.write(data, 0, read)
-                    }
-                }
-                
-                outputStream.close()
-                channelClient.close(channel).await()
-
-            } catch (e: Exception) {
-                e.printStackTrace()
-                updateStatus("Status: Connection Error")
-            } finally {
-                audioRecord.stop()
-                audioRecord.release()
-            }
-        }
+    private fun startSensorService() {
+        val intent = Intent(this, WearSensorService::class.java)
+        ContextCompat.startForegroundService(this, intent)
     }
 
-    private fun stopRecording() {
-        isRecording = false
-        recordingJob?.cancel()
+    private fun stopSensorService() {
+        val intent = Intent(this, WearSensorService::class.java).apply {
+            action = "STOP_SERVICE"
+        }
+        startService(intent)
+    }
+
+    private fun isServiceRunning(serviceClass: Class<*>): Boolean {
+        val manager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        for (service in manager.getRunningServices(Int.MAX_VALUE)) {
+            if (serviceClass.name == service.service.className) {
+                return true
+            }
+        }
+        return false
     }
 }
