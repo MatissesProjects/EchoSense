@@ -109,6 +109,7 @@ public:
 
     void setPreAmpGain(float gain);
     void setVoiceBoost(float gainDb);
+    void setHpfFreq(float freq);
     void setNoiseGateThreshold(float threshold);
     void setEqualizerBandGain(int bandIndex, float gainDb);
     void setMasterGain(float gain);
@@ -145,6 +146,7 @@ private:
 
     std::atomic<float> mPreAmpGain{1.0f};
     std::atomic<float> mVoiceBoostDb{0.0f};
+    std::atomic<float> mHpfFreq{150.0f};
     std::atomic<float> mNoiseGateThreshold{0.0f};
     std::atomic<float> mManualBandGains[5];
     std::atomic<float> mProfileBandGains[5];

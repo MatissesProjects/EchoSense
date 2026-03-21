@@ -54,6 +54,10 @@ JNIEXPORT void JNICALL JNI_METHOD(setVoiceBoost)(JNIEnv *env, jobject, jfloat ga
     if (audioEngine != nullptr) audioEngine->setVoiceBoost(gainDb);
 }
 
+JNIEXPORT void JNICALL JNI_METHOD(setHpfFreq)(JNIEnv *env, jobject, jfloat freq) {
+    if (audioEngine != nullptr) audioEngine->setHpfFreq(freq);
+}
+
 JNIEXPORT void JNICALL JNI_METHOD(setNoiseGateThreshold)(JNIEnv *env, jobject, jfloat threshold) {
     if (audioEngine != nullptr) audioEngine->setNoiseGateThreshold(threshold);
 }

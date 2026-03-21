@@ -18,6 +18,7 @@ object AudioEngineLib {
     
     external fun setPreAmpGain(gain: Float)
     external fun setVoiceBoost(gainDb: Float)
+    external fun setHpfFreq(freq: Float)
     external fun setNoiseGateThreshold(threshold: Float)
     external fun setMasterGain(gain: Float)
     external fun setProfile(profile: Int)
@@ -33,6 +34,7 @@ object AudioEngineLib {
         val settings = AudioSettingsManager(context)
         setPreAmpGain(settings.getFloat(AudioSettingsManager.KEY_PRE_AMP, 1.0f))
         setVoiceBoost(settings.getFloat(AudioSettingsManager.KEY_VOICE_BOOST, 0.0f))
+        setHpfFreq(settings.getFloat("hpf_freq", 150.0f))
         setMasterGain(settings.getFloat(AudioSettingsManager.KEY_MASTER_GAIN, 1.0f))
         setNoiseGateThreshold(settings.getFloat(AudioSettingsManager.KEY_NOISE_GATE, 0.0f))
         setRemoteGain(settings.getFloat(AudioSettingsManager.KEY_WATCH_GAIN, 2.0f))

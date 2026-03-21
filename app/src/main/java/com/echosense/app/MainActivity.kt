@@ -87,6 +87,7 @@ class MainActivity : AppCompatActivity() {
         binding.seekBarPreAmp.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_PRE_AMP, 1.0f) * 10).toInt()
         binding.seekBarVoiceBoost.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_VOICE_BOOST, 0.0f) / 0.3f).toInt()
         binding.seekBarMasterGain.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_MASTER_GAIN, 1.0f) * 10).toInt()
+        binding.seekBarHpf.progress = (settingsManager.getFloat("hpf_freq", 150.0f) / 5.0f).toInt()
         binding.seekBarNoiseGate.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_NOISE_GATE, 0.0f) * 200).toInt()
         binding.seekBarWatchGain.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_WATCH_GAIN, 2.0f) * 20).toInt()
         
@@ -242,6 +243,16 @@ class MainActivity : AppCompatActivity() {
                 val gain = p / 10.0f
                 AudioEngineLib.setMasterGain(gain) 
                 settingsManager.saveFloat(AudioSettingsManager.KEY_MASTER_GAIN, gain)
+            }
+            override fun onStartTrackingTouch(s: SeekBar?) {}
+            override fun onStopTrackingTouch(s: SeekBar?) {}
+        })
+
+        binding.seekBarHpf.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
+                val freq = p * 5.0f + 50.0f // 50Hz to 550Hz
+                AudioEngineLib.setHpfFreq(freq) 
+                settingsManager.saveFloat("hpf_freq", freq)
             }
             override fun onStartTrackingTouch(s: SeekBar?) {}
             override fun onStopTrackingTouch(s: SeekBar?) {}

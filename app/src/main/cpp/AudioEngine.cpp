@@ -82,6 +82,7 @@ void AudioEngine::writeRemoteAudio(const float* data, int32_t numFrames) {
 
 void AudioEngine::setPreAmpGain(float gain) { mPreAmpGain.store(gain); }
 void AudioEngine::setVoiceBoost(float gainDb) { mVoiceBoostDb.store(gainDb); mParamsChanged.store(true); }
+void AudioEngine::setHpfFreq(float freq) { mHpfFreq.store(freq); mParamsChanged.store(true); }
 void AudioEngine::setNoiseGateThreshold(float threshold) { mNoiseGateThreshold.store(threshold); }
 void AudioEngine::setMasterGain(float gain) { mMasterGain.store(gain); }
 void AudioEngine::setEqualizerBandGain(int bandIndex, float gainDb) {
@@ -144,6 +145,8 @@ float AudioEngine::getNextResampledRemoteSample() {
 }
 
 void AudioEngine::updateFilters() {
+    mHighPass.setHighPass(mHpfFreq.load(), mSampleRate, 0.707f);
+    
     float freqs[5] = {200.0f, 500.0f, 1500.0f, 3000.0f, 6000.0f};
     for (int i = 0; i < 5; ++i) {
         float combinedGain = mManualBandGains[i].load() + mProfileBandGains[i].load();
