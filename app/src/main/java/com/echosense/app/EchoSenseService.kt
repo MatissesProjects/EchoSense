@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.google.android.gms.wearable.ChannelClient
 import com.google.android.gms.wearable.ChannelClient.Channel
@@ -19,6 +20,7 @@ import java.nio.ByteOrder
 
 class EchoSenseService : Service() {
 
+    private val TAG = "EchoSenseService"
     private val CHANNEL_ID = "EchoSenseServiceChannel"
     private val NOTIFICATION_ID = 1
     private val WEAR_AUDIO_CHANNEL = "/audio_stream_channel"
@@ -28,9 +30,13 @@ class EchoSenseService : Service() {
 
     private val channelCallback = object : ChannelClient.ChannelCallback() {
         override fun onChannelOpened(channel: Channel) {
+            Log.d(TAG, "Channel opened on phone: ${channel.path}")
             if (channel.path == WEAR_AUDIO_CHANNEL) {
                 receiveAudioStream(channel)
             }
+        }
+        override fun onChannelClosed(channel: Channel, closeReason: Int, appSpecificErrorCode: Int) {
+            Log.d(TAG, "Channel closed: ${channel.path}, reason: $closeReason")
         }
     }
 
@@ -39,10 +45,12 @@ class EchoSenseService : Service() {
         createNotificationChannel()
         channelClient = Wearable.getChannelClient(this)
         channelClient.registerChannelCallback(channelCallback)
+        Log.d(TAG, "Service Created, ChannelCallback registered")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == "STOP_SERVICE") {
+            Log.d(TAG, "Stop service action received")
             stopSelf()
             return START_NOT_STICKY
         }
@@ -52,6 +60,7 @@ class EchoSenseService : Service() {
         
         AudioEngineLib.startAudioEngine()
         AudioEngineLib.restoreSettings(this)
+        Log.d(TAG, "Audio Engine started and settings restored")
         
         return START_STICKY
     }
@@ -59,6 +68,7 @@ class EchoSenseService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        Log.d(TAG, "Service being destroyed")
         channelClient.unregisterChannelCallback(channelCallback)
         channelJob?.cancel()
         AudioEngineLib.stopAudioEngine()
@@ -66,27 +76,39 @@ class EchoSenseService : Service() {
     }
 
     private fun receiveAudioStream(channel: Channel) {
+        Log.d(TAG, "Starting to receive audio stream from channel")
         channelJob?.cancel()
         channelJob = CoroutineScope(Dispatchers.IO).launch {
             try {
                 val inputStream = channelClient.getInputStream(channel).await()
-                val buffer = ByteArray(2048)
-                val shortArray = ShortArray(1024)
-                val floatArray = FloatArray(1024)
+                Log.d(TAG, "InputStream acquired on phone")
+                val buffer = ByteArray(4096)
+                val floatArray = FloatArray(2048)
 
+                var totalBytesRead = 0L
                 while (true) {
                     val read = inputStream.read(buffer)
-                    if (read == -1) break
+                    if (read == -1) {
+                        Log.d(TAG, "InputStream reached EOF")
+                        break
+                    }
                     
+                    totalBytesRead += read
+                    if (totalBytesRead % 32000 == 0L) Log.d(TAG, "Read $totalBytesRead bytes on phone...")
+
                     val shortBuffer = ByteBuffer.wrap(buffer, 0, read).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
                     val shortsToRead = shortBuffer.remaining()
+                    if (shortsToRead > floatArray.size) {
+                        // This shouldn't happen with 4096 byte buffer and 2048 float array
+                        continue
+                    }
                     for (i in 0 until shortsToRead) {
                         floatArray[i] = shortBuffer.get().toFloat() / 32768.0f
                     }
                     AudioEngineLib.writeRemoteAudio(floatArray.copyOf(shortsToRead))
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e(TAG, "Error in receiveAudioStream", e)
             }
         }
     }
