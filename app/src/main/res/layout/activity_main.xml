@@ -57,6 +57,15 @@
                 android:backgroundTint="#FF9800" />
         </LinearLayout>
 
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/swTargetLock"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Target Lock (Crowd Isolation)"
+            android:textColor="#FF4081"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp" />
+
         <!-- Profiles Section -->
         <TextView
             android:layout_width="wrap_content"

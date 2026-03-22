@@ -115,6 +115,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.swSensorFusion.isChecked = settingsManager.prefs.getBoolean("sensor_fusion", false)
+        binding.swTargetLock.isChecked = settingsManager.prefs.getBoolean("target_lock", false)
 
         binding.seekBarBand1.progress = (settingsManager.getFloat("band_0", 0.0f) / 0.24f + 100).toInt()
         binding.seekBarBand2.progress = (settingsManager.getFloat("band_1", 0.0f) / 0.24f + 100).toInt()
@@ -146,6 +147,23 @@ class MainActivity : AppCompatActivity() {
             AudioEngineLib.autoTune()
             binding.chipGroupProfile.check(R.id.chipProfileCustom)
             Toast.makeText(this, "AI Adaptive Tuning Applied", Toast.LENGTH_SHORT).show()
+        }
+
+        binding.swTargetLock.setOnCheckedChangeListener { _, isChecked ->
+            AudioEngineLib.setTargetLock(isChecked)
+            settingsManager.prefs.edit().putBoolean("target_lock", isChecked).apply()
+            
+            // Give visual feedback that sliders are overridden
+            if (isChecked) {
+                binding.chipGroupProfile.isEnabled = false
+                binding.seekBarHpf.isEnabled = false
+                binding.seekBarLpf.isEnabled = false
+                Toast.makeText(this, "Target Lock Engaged: Crowds Isolated", Toast.LENGTH_SHORT).show()
+            } else {
+                binding.chipGroupProfile.isEnabled = true
+                binding.seekBarHpf.isEnabled = true
+                binding.seekBarLpf.isEnabled = true
+            }
         }
 
         binding.chipGroupProfile.setOnCheckedChangeListener { _, checkedId ->

@@ -25,6 +25,7 @@ object AudioEngineLib {
     external fun setMasterGain(gain: Float)
     external fun setProfile(profile: Int)
     external fun setSensorFusion(enabled: Boolean)
+    external fun setTargetLock(enabled: Boolean)
     external fun setEqualizerBandGain(bandIndex: Int, gain: Float)
     
     external fun getVolumeLevel(): Float
@@ -44,6 +45,7 @@ object AudioEngineLib {
         setRemoteGain(settings.getFloat(AudioSettingsManager.KEY_WATCH_GAIN, 2.0f))
         setProfile(settings.getInt(AudioSettingsManager.KEY_PROFILE, 3))
         setSensorFusion(settings.prefs.getBoolean("sensor_fusion", false))
+        setTargetLock(settings.prefs.getBoolean("target_lock", false))
         
         for (i in 0 until 5) {
             val gain = settings.getFloat("band_$i", 0.0f)
