@@ -20,6 +20,9 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.echosense.app.databinding.ActivityMainBinding
+import com.echosense.app.db.ConversationNote
+import com.echosense.app.db.EchoSenseDatabase
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -342,7 +345,16 @@ class MainActivity : AppCompatActivity() {
                 }
                 override fun onResults(results: Bundle?) {
                     val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    if (!matches.isNullOrEmpty()) binding.tvTranscription.text = matches[0]
+                    if (!matches.isNullOrEmpty()) {
+                        val text = matches[0]
+                        binding.tvTranscription.text = text
+                        
+                        // Save to database
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            val db = EchoSenseDatabase.getDatabase(this@MainActivity)
+                            db.conversationNoteDao().insertNote(ConversationNote(text = text))
+                        }
+                    }
                     if (AudioEngineLib.isAudioEngineRunning()) startListening()
                 }
                 override fun onPartialResults(partialResults: Bundle?) {

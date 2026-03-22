@@ -62,7 +62,7 @@ EchoSense is an Android-first application designed to act as an intelligent, con
 
 ### Phase 4: Stabilization & Memory
 * [ ] **Sensor Fusion Stabilization:** Debug and fix WearOS 16kHz->48kHz resampling and streaming data flow.
-* [ ] Set up the Room Database for profiles and conversational history.
+* [x] Set up the Room Database for profiles and conversational history.
 * [ ] Build the UI for viewing past notes.
 * [ ] *The Wireless Test:* Introduce the Pixel Buds Pro 2 and attempt to apply the Phase 1 DSP code to the Bluetooth LE Audio stream, optimizing buffer sizes to mitigate the newly introduced latency.
 
