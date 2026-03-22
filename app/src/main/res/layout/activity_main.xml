@@ -319,6 +319,34 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:text="Hiss Killer (LPF Cutoff)"
+            android:textColor="#E1F5FE"
+            android:textStyle="bold" />
+        <SeekBar
+            android:id="@+id/seekBarLpf"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="80"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Clap Protection (Sudden Noise Limiter)"
+            android:textColor="#FF5252"
+            android:textStyle="bold" />
+        <SeekBar
+            android:id="@+id/seekBarLimiter"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="90"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:text="Noise Gate Threshold"
             android:textColor="#FFFFFF" />
         <SeekBar

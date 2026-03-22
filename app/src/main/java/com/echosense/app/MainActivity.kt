@@ -88,6 +88,8 @@ class MainActivity : AppCompatActivity() {
         binding.seekBarVoiceBoost.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_VOICE_BOOST, 0.0f) / 0.3f).toInt()
         binding.seekBarMasterGain.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_MASTER_GAIN, 1.0f) * 10).toInt()
         binding.seekBarHpf.progress = (settingsManager.getFloat("hpf_freq", 150.0f) / 5.0f).toInt()
+        binding.seekBarLpf.progress = ((settingsManager.getFloat("lpf_freq", 12000.0f) - 1000.0f) / 190.0f).toInt()
+        binding.seekBarLimiter.progress = (settingsManager.getFloat("limiter_thresh", 0.9f) * 100).toInt()
         binding.seekBarNoiseGate.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_NOISE_GATE, 0.0f) * 200).toInt()
         binding.seekBarWatchGain.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_WATCH_GAIN, 2.0f) * 20).toInt()
         
@@ -253,6 +255,26 @@ class MainActivity : AppCompatActivity() {
                 val freq = p * 5.0f + 50.0f // 50Hz to 550Hz
                 AudioEngineLib.setHpfFreq(freq) 
                 settingsManager.saveFloat("hpf_freq", freq)
+            }
+            override fun onStartTrackingTouch(s: SeekBar?) {}
+            override fun onStopTrackingTouch(s: SeekBar?) {}
+        })
+
+        binding.seekBarLpf.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
+                val freq = p * 190.0f + 1000.0f // 1kHz to 20kHz
+                AudioEngineLib.setLpfFreq(freq) 
+                settingsManager.saveFloat("lpf_freq", freq)
+            }
+            override fun onStartTrackingTouch(s: SeekBar?) {}
+            override fun onStopTrackingTouch(s: SeekBar?) {}
+        })
+
+        binding.seekBarLimiter.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
+                val thresh = p / 100.0f // 0.0 to 1.0
+                AudioEngineLib.setLimiterThreshold(thresh) 
+                settingsManager.saveFloat("limiter_thresh", thresh)
             }
             override fun onStartTrackingTouch(s: SeekBar?) {}
             override fun onStopTrackingTouch(s: SeekBar?) {}

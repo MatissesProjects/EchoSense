@@ -110,6 +110,8 @@ public:
     void setPreAmpGain(float gain);
     void setVoiceBoost(float gainDb);
     void setHpfFreq(float freq);
+    void setLpfFreq(float freq);
+    void setLimiterThreshold(float threshold);
     void setNoiseGateThreshold(float threshold);
     void setEqualizerBandGain(int bandIndex, float gainDb);
     void setMasterGain(float gain);
@@ -147,6 +149,8 @@ private:
     std::atomic<float> mPreAmpGain{1.0f};
     std::atomic<float> mVoiceBoostDb{0.0f};
     std::atomic<float> mHpfFreq{150.0f};
+    std::atomic<float> mLpfFreq{12000.0f};
+    std::atomic<float> mLimiterThreshold{0.9f};
     std::atomic<float> mNoiseGateThreshold{0.0f};
     std::atomic<float> mManualBandGains[5];
     std::atomic<float> mProfileBandGains[5];
@@ -162,6 +166,7 @@ private:
     const int32_t mGateHoldFrames = 2400; // ~50ms at 48kHz
 
     Biquad mHighPass;
+    Biquad mLowPass;
     Biquad mEQBands[5];
     Biquad mVoiceFilters[2];
 
