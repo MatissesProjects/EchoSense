@@ -126,6 +126,11 @@ void AudioEngine::setSensorFusion(bool enabled) {
     mSensorFusionEnabled.store(enabled);
 }
 
+void AudioEngine::setTargetLock(bool enabled) {
+    mTargetLockEnabled.store(enabled);
+    mParamsChanged.store(true);
+}
+
 float AudioEngine::getNextResampledRemoteSample() {
     if (mResamplePhase == 0) {
         mPrevRemoteSample = mCurrRemoteSample;
@@ -143,16 +148,33 @@ float AudioEngine::getNextResampledRemoteSample() {
 }
 
 void AudioEngine::updateFilters() {
-    mHighPass.setHighPass(mHpfFreq.load(), mSampleRate, 0.707f);
-    mLowPass.setLowPass(mLpfFreq.load(), mSampleRate, 0.707f);
-    
-    float freqs[5] = {200.0f, 500.0f, 1500.0f, 3000.0f, 6000.0f};
-    for (int i = 0; i < 5; ++i) {
-        float combinedGain = mManualBandGains[i].load() + mProfileBandGains[i].load();
-        mEQBands[i].setPeaking(freqs[i], mSampleRate, 1.0f, combinedGain);
+    if (mTargetLockEnabled.load()) {
+        // Hyper-restrictive "Tunnel" filter for crowds
+        mHighPass.setHighPass(300.0f, mSampleRate, 0.707f); // Cut all rumble/bass
+        mLowPass.setLowPass(4000.0f, mSampleRate, 0.707f);  // Cut all hiss/air
+        
+        // Massive boost to core formants, kill everything else
+        mEQBands[0].setPeaking(200.0f, mSampleRate, 1.0f, -24.0f);
+        mEQBands[1].setPeaking(500.0f, mSampleRate, 1.0f, -12.0f);
+        mEQBands[2].setPeaking(1500.0f, mSampleRate, 2.0f, 18.0f); // Tight Q, massive boost
+        mEQBands[3].setPeaking(3000.0f, mSampleRate, 2.0f, 12.0f); // Tight Q, massive boost
+        mEQBands[4].setPeaking(6000.0f, mSampleRate, 1.0f, -24.0f);
+        
+        mVoiceFilters[0].setPeaking(700.0f, mSampleRate, 0.4f, 5.0f);
+        mVoiceFilters[1].setPeaking(3200.0f, mSampleRate, 0.4f, 5.0f);
+    } else {
+        // Normal profile + manual offset logic
+        mHighPass.setHighPass(mHpfFreq.load(), mSampleRate, 0.707f);
+        mLowPass.setLowPass(mLpfFreq.load(), mSampleRate, 0.707f);
+        
+        float freqs[5] = {200.0f, 500.0f, 1500.0f, 3000.0f, 6000.0f};
+        for (int i = 0; i < 5; ++i) {
+            float combinedGain = mManualBandGains[i].load() + mProfileBandGains[i].load();
+            mEQBands[i].setPeaking(freqs[i], mSampleRate, 1.0f, combinedGain);
+        }
+        mVoiceFilters[0].setPeaking(700.0f, mSampleRate, 0.4f, mVoiceBoostDb.load() * 0.4f);
+        mVoiceFilters[1].setPeaking(3200.0f, mSampleRate, 0.4f, mVoiceBoostDb.load() * 0.8f);
     }
-    mVoiceFilters[0].setPeaking(700.0f, mSampleRate, 0.4f, mVoiceBoostDb.load() * 0.4f);
-    mVoiceFilters[1].setPeaking(3200.0f, mSampleRate, 0.4f, mVoiceBoostDb.load() * 0.8f);
     mParamsChanged.store(false);
 }
 

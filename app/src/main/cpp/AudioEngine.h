@@ -117,6 +117,7 @@ public:
     void setMasterGain(float gain);
     void setProfile(AudioProfile profile);
     void setSensorFusion(bool enabled);
+    void setTargetLock(bool enabled);
     float getVolumeLevel() const { return mCurrentVolume.load(); }
 
     void getFftData(float* output, int size);
@@ -157,6 +158,7 @@ private:
     std::atomic<float> mMasterGain{1.0f};
     std::atomic<AudioProfile> mAudioProfile{AudioProfile::Custom};
     std::atomic<bool> mSensorFusionEnabled{false};
+    std::atomic<bool> mTargetLockEnabled{false};
     std::atomic<float> mCurrentVolume{0.0f};
     std::atomic<bool> mParamsChanged{true};
 

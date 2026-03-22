@@ -82,6 +82,10 @@ JNIEXPORT void JNICALL JNI_METHOD(setSensorFusion)(JNIEnv *env, jobject, jboolea
     if (audioEngine != nullptr) audioEngine->setSensorFusion(enabled);
 }
 
+JNIEXPORT void JNICALL JNI_METHOD(setTargetLock)(JNIEnv *env, jobject, jboolean enabled) {
+    if (audioEngine != nullptr) audioEngine->setTargetLock(enabled);
+}
+
 JNIEXPORT void JNICALL JNI_METHOD(setEqualizerBandGain)(JNIEnv *env, jobject, jint bandIndex, jfloat gain) {
     if (audioEngine != nullptr) audioEngine->setEqualizerBandGain(bandIndex, gain);
 }
