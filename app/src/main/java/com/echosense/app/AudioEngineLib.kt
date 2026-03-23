@@ -22,6 +22,7 @@ object AudioEngineLib {
     external fun setLpfFreq(freq: Float)
     external fun setLimiterThreshold(threshold: Float)
     external fun setNoiseGateThreshold(threshold: Float)
+    external fun setSpectralReduction(strength: Float)
     external fun setMasterGain(gain: Float)
     external fun setProfile(profile: Int)
     external fun setSensorFusion(enabled: Boolean)
@@ -32,6 +33,7 @@ object AudioEngineLib {
     external fun getFftData(output: FloatArray)
     external fun getEqCurveData(output: FloatArray)
     external fun autoTune()
+    external fun learnNoise()
 
     fun restoreSettings(context: Context) {
         val settings = AudioSettingsManager(context)
@@ -42,6 +44,7 @@ object AudioEngineLib {
         setLimiterThreshold(settings.getFloat("limiter_thresh", 0.9f))
         setMasterGain(settings.getFloat(AudioSettingsManager.KEY_MASTER_GAIN, 1.0f))
         setNoiseGateThreshold(settings.getFloat(AudioSettingsManager.KEY_NOISE_GATE, 0.0f))
+        setSpectralReduction(settings.getFloat("spectral_reduction", 0.0f))
         setRemoteGain(settings.getFloat(AudioSettingsManager.KEY_WATCH_GAIN, 2.0f))
         setProfile(settings.getInt(AudioSettingsManager.KEY_PROFILE, 3))
         setSensorFusion(settings.prefs.getBoolean("sensor_fusion", false))

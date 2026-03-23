@@ -10,10 +10,12 @@ AudioEngine::AudioEngine() {
         mManualBandGains[i].store(0.0f);
         mProfileBandGains[i].store(0.0f);
     }
+    mSpectralProcessor = new SpectralProcessor(FFT_SIZE);
 }
 
 AudioEngine::~AudioEngine() {
     stop();
+    delete mSpectralProcessor;
 }
 
 bool AudioEngine::start() {
@@ -85,7 +87,9 @@ void AudioEngine::setHpfFreq(float freq) { mHpfFreq.store(freq); mParamsChanged.
 void AudioEngine::setLpfFreq(float freq) { mLpfFreq.store(freq); mParamsChanged.store(true); }
 void AudioEngine::setLimiterThreshold(float threshold) { mLimiterThreshold.store(threshold); }
 void AudioEngine::setNoiseGateThreshold(float threshold) { mNoiseGateThreshold.store(threshold); }
+void AudioEngine::setSpectralReduction(float strength) { mSpectralReductionStrength.store(strength); }
 void AudioEngine::setMasterGain(float gain) { mMasterGain.store(gain); }
+
 void AudioEngine::setEqualizerBandGain(int bandIndex, float gainDb) {
     if (bandIndex >= 0 && bandIndex < 5) {
         mManualBandGains[bandIndex].store(gainDb);
@@ -131,6 +135,12 @@ void AudioEngine::setTargetLock(bool enabled) {
     mParamsChanged.store(true);
 }
 
+void AudioEngine::learnNoise() {
+    for (int i = 0; i < FFT_SIZE; i++) mNoiseProfile[i] = 0.0f;
+    mLearningCounter = 0;
+    mLearningNoise.store(true);
+}
+
 float AudioEngine::getNextResampledRemoteSample() {
     if (mResamplePhase == 0) {
         mPrevRemoteSample = mCurrRemoteSample;
@@ -149,24 +159,18 @@ float AudioEngine::getNextResampledRemoteSample() {
 
 void AudioEngine::updateFilters() {
     if (mTargetLockEnabled.load()) {
-        // Hyper-restrictive "Tunnel" filter for crowds
-        mHighPass.setHighPass(300.0f, mSampleRate, 0.707f); // Cut all rumble/bass
-        mLowPass.setLowPass(4000.0f, mSampleRate, 0.707f);  // Cut all hiss/air
-        
-        // Massive boost to core formants, kill everything else
+        mHighPass.setHighPass(300.0f, mSampleRate, 0.707f);
+        mLowPass.setLowPass(4000.0f, mSampleRate, 0.707f);
         mEQBands[0].setPeaking(200.0f, mSampleRate, 1.0f, -24.0f);
         mEQBands[1].setPeaking(500.0f, mSampleRate, 1.0f, -12.0f);
-        mEQBands[2].setPeaking(1500.0f, mSampleRate, 2.0f, 18.0f); // Tight Q, massive boost
-        mEQBands[3].setPeaking(3000.0f, mSampleRate, 2.0f, 12.0f); // Tight Q, massive boost
+        mEQBands[2].setPeaking(1500.0f, mSampleRate, 2.0f, 18.0f);
+        mEQBands[3].setPeaking(3000.0f, mSampleRate, 2.0f, 12.0f);
         mEQBands[4].setPeaking(6000.0f, mSampleRate, 1.0f, -24.0f);
-        
         mVoiceFilters[0].setPeaking(700.0f, mSampleRate, 0.4f, 5.0f);
         mVoiceFilters[1].setPeaking(3200.0f, mSampleRate, 0.4f, 5.0f);
     } else {
-        // Normal profile + manual offset logic
         mHighPass.setHighPass(mHpfFreq.load(), mSampleRate, 0.707f);
         mLowPass.setLowPass(mLpfFreq.load(), mSampleRate, 0.707f);
-        
         float freqs[5] = {200.0f, 500.0f, 1500.0f, 3000.0f, 6000.0f};
         for (int i = 0; i < 5; ++i) {
             float combinedGain = mManualBandGains[i].load() + mProfileBandGains[i].load();
@@ -182,7 +186,6 @@ inline float AudioEngine::processSample(float sample) {
     if (mCurrentRampGain < 1.0f) mCurrentRampGain += mRampStep;
     float out = sample * mPreAmpGain.load();
 
-    // Noise Gate
     float absOut = std::abs(out);
     if (absOut > mNoiseGateThreshold.load()) {
         mGateHoldCounter = mGateHoldFrames;
@@ -191,7 +194,6 @@ inline float AudioEngine::processSample(float sample) {
     }
     if (mGateHoldCounter <= 0) return 0.0f;
 
-    // Filters
     out = mHighPass.process(out);
     out = mLowPass.process(out);
     out = mVoiceFilters[0].process(out);
@@ -200,7 +202,6 @@ inline float AudioEngine::processSample(float sample) {
     
     out *= mMasterGain.load() * mCurrentRampGain;
 
-    // Clap Killer (Instant Limiter)
     float limit = mLimiterThreshold.load();
     if (out > limit) out = limit + (out - limit) * 0.1f;
     else if (out < -limit) out = -limit + (out + limit) * 0.1f;
@@ -271,6 +272,35 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
             }
         } else {
             for (int i = 0; i < numFrames; i++) outputBuffer[i] = 0.0f;
+        }
+    }
+
+    // AI Spectral Processing
+    float reduction = mSpectralReductionStrength.load();
+    if (mLearningNoise.load()) {
+        // Average spectral profile over ~1 second
+        for (int i = 0; i < numFrames; i += FFT_SIZE) {
+            if (i + FFT_SIZE <= numFrames) {
+                std::vector<std::complex<float>> block(FFT_SIZE);
+                for(int j=0; j<FFT_SIZE; j++) block[j] = std::complex<float>(outputBuffer[i+j], 0.0f);
+                
+                mSpectralProcessor->fft(block, false);
+                
+                for(int j=0; j<FFT_SIZE; j++) {
+                    mNoiseProfile[j] = (mNoiseProfile[j] * mLearningCounter + std::abs(block[j])) / (mLearningCounter + 1);
+                }
+                mLearningCounter++;
+            }
+        }
+        if (mLearningCounter > 200) {
+            mLearningNoise.store(false);
+            __android_log_print(ANDROID_LOG_INFO, TAG, "Spectral Noise Learning Complete");
+        }
+    } else if (reduction > 0.01f) {
+        for (int i = 0; i < numFrames; i += FFT_SIZE) {
+            if (i + FFT_SIZE <= numFrames) {
+                mSpectralProcessor->processBlock(outputBuffer + i, mNoiseProfile, reduction);
+            }
         }
     }
 

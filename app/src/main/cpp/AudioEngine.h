@@ -6,10 +6,11 @@
 #include <cmath>
 #include <vector>
 #include <mutex>
+#include "SpectralProcessor.h"
 
 #define VIS_BINS 64
 #define REMOTE_BUFFER_SIZE 4096
-#define NOISE_PROFILE_SIZE 128
+#define FFT_SIZE 128
 
 enum class InputSource {
     Default = 0,
@@ -113,11 +114,13 @@ public:
     void setLpfFreq(float freq);
     void setLimiterThreshold(float threshold);
     void setNoiseGateThreshold(float threshold);
+    void setSpectralReduction(float strength);
     void setEqualizerBandGain(int bandIndex, float gainDb);
     void setMasterGain(float gain);
     void setProfile(AudioProfile profile);
     void setSensorFusion(bool enabled);
     void setTargetLock(bool enabled);
+    void learnNoise();
     float getVolumeLevel() const { return mCurrentVolume.load(); }
 
     void getFftData(float* output, int size);
@@ -153,6 +156,7 @@ private:
     std::atomic<float> mLpfFreq{12000.0f};
     std::atomic<float> mLimiterThreshold{0.9f};
     std::atomic<float> mNoiseGateThreshold{0.0f};
+    std::atomic<float> mSpectralReductionStrength{0.0f};
     std::atomic<float> mManualBandGains[5];
     std::atomic<float> mProfileBandGains[5];
     std::atomic<float> mMasterGain{1.0f};
@@ -172,9 +176,11 @@ private:
     Biquad mEQBands[5];
     Biquad mVoiceFilters[2];
 
-    // Intelligent Noise Profile
-    float mNoiseProfile[NOISE_PROFILE_SIZE] = {0};
+    // Spectral AI
+    SpectralProcessor* mSpectralProcessor = nullptr;
+    float mNoiseProfile[FFT_SIZE] = {0};
     std::atomic<bool> mLearningNoise{false};
+    int mLearningCounter = 0;
 
     float mVisData[VIS_BINS] = {0};
     std::mutex mVisMutex;

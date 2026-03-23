@@ -66,6 +66,42 @@
             android:textStyle="bold"
             android:layout_marginBottom="16dp" />
 
+        <!-- Spectral AI Section -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Spectral AI Noise Killer"
+            android:textColor="#BBDEFB"
+            android:textStyle="bold" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
+            <Button
+                android:id="@+id/btnLearnNoise"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Learn Noise"
+                android:textSize="12sp"
+                android:backgroundTint="#607D8B"
+                android:layout_marginEnd="16dp" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Strength:"
+                android:textColor="#FFFFFF"
+                android:layout_marginEnd="8dp" />
+            <SeekBar
+                android:id="@+id/seekBarSpectralReduction"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:max="100"
+                android:progress="0" />
+        </LinearLayout>
+
         <!-- Profiles Section -->
         <TextView
             android:layout_width="wrap_content"
