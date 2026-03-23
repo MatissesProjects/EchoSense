@@ -102,6 +102,14 @@ JNIEXPORT void JNICALL JNI_METHOD(setTargetSpeaker)(JNIEnv *env, jobject, jint s
     if (audioEngine != nullptr) audioEngine->setTargetSpeaker(speakerId);
 }
 
+JNIEXPORT void JNICALL JNI_METHOD(setMbCompression)(JNIEnv *env, jobject, jfloat ratio) {
+    if (audioEngine != nullptr) audioEngine->setMbCompression(ratio);
+}
+
+JNIEXPORT void JNICALL JNI_METHOD(setBeamforming)(JNIEnv *env, jobject, jboolean enabled) {
+    if (audioEngine != nullptr) audioEngine->setBeamforming(enabled);
+}
+
 JNIEXPORT void JNICALL JNI_METHOD(setTransientSuppression)(JNIEnv *env, jobject, jfloat strength) {
     if (audioEngine != nullptr) audioEngine->setTransientSuppression(strength);
 }

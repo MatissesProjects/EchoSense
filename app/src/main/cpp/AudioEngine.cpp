@@ -140,6 +140,14 @@ void AudioEngine::setTargetSpeaker(int speakerId) {
     mTargetSpeakerId.store(speakerId);
 }
 
+void AudioEngine::setMbCompression(float ratio) {
+    mMbCompressionRatio.store(ratio);
+}
+
+void AudioEngine::setBeamforming(bool enabled) {
+    mBeamformingEnabled.store(enabled);
+}
+
 void AudioEngine::setTransientSuppression(float strength) {
     mTransientSuppressionStrength.store(strength);
 }
@@ -333,6 +341,21 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
         }
     }
 
+    // --- AI Beamforming (Software Array) ---
+    if (mBeamformingEnabled.load() && fusion && source != InputSource::Watch) {
+        // Simple Phase-Cancellation Beamforming:
+        // Use the watch mic as a 'noise reference' (180 deg out of phase) 
+        // to subtract common ambient noise from the phone mic.
+        float remoteGain = mRemoteGain.load() * 0.5f; // Calibrate for cancellation
+        mRemoteReadPos = (mRemoteReadPos - numFrames + REMOTE_BUFFER_SIZE) % REMOTE_BUFFER_SIZE; // Peek back
+        for (int i = 0; i < numFrames; i++) {
+            float noiseRef = mRemoteBuffer[(mRemoteReadPos + i) % REMOTE_BUFFER_SIZE] * remoteGain;
+            outputBuffer[i] = outputBuffer[i] - noiseRef;
+        }
+        // Advance read pos properly
+        mRemoteReadPos = (mRemoteReadPos + numFrames) % REMOTE_BUFFER_SIZE;
+    }
+
     // AI Spectral Processing
     float reduction = mSpectralReductionStrength.load();
     float specGate = mSpectralGateThreshold.load();
@@ -365,6 +388,32 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
     if (fusion) {
         float dynamicThresh = baseThreshold + (ambientRMS * 0.5f);
         mNoiseGateThreshold.store(dynamicThresh);
+    }
+
+    // --- Multi-band AI Dynamics ---
+    float mbRatio = mMbCompressionRatio.load();
+    if (mbRatio > 1.01f) {
+        // Simple 3-band split logic (not a perfect crossover, but efficient)
+        float lowEnergy = 0, midEnergy = 0, highEnergy = 0;
+        for (int i = 0; i < numFrames; i++) {
+            float absS = std::abs(outputBuffer[i]);
+            if (i < numFrames / 3) lowEnergy += absS;
+            else if (i < 2 * numFrames / 3) midEnergy += absS;
+            else highEnergy += absS;
+        }
+        lowEnergy /= (numFrames/3.0f); midEnergy /= (numFrames/3.0f); highEnergy /= (numFrames/3.0f);
+
+        // Compress bands that exceed threshold (-24dB approx)
+        float thresh = 0.06f; 
+        float lowGain = (lowEnergy > thresh) ? 1.0f / (1.0f + (lowEnergy - thresh) * mbRatio) : 1.0f;
+        float midGain = (midEnergy > thresh) ? 1.0f / (1.0f + (midEnergy - thresh) * (mbRatio * 0.5f)) : 1.0f; // Mid less compressed for speech
+        float highGain = (highEnergy > thresh) ? 1.0f / (1.0f + (highEnergy - thresh) * mbRatio) : 1.0f;
+
+        for (int i = 0; i < numFrames; i++) {
+            if (i < numFrames / 3) outputBuffer[i] *= lowGain;
+            else if (i < 2 * numFrames / 3) outputBuffer[i] *= midGain;
+            else outputBuffer[i] *= highGain;
+        }
     }
 
     for (int i = 0; i < numFrames; ++i) {

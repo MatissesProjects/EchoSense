@@ -122,6 +122,8 @@ class MainActivity : AppCompatActivity() {
 
         binding.swSensorFusion.isChecked = settingsManager.prefs.getBoolean("sensor_fusion", false)
         binding.swTargetLock.isChecked = settingsManager.prefs.getBoolean("target_lock", false)
+        binding.swBeamforming.isChecked = settingsManager.prefs.getBoolean("beamforming", false)
+        binding.seekBarMbRatio.progress = (settingsManager.getFloat("mb_compression", 1.0f) * 10 - 10).toInt()
 
         val speakerId = settingsManager.getInt(AudioSettingsManager.KEY_TARGET_SPEAKER, -1)
         when (speakerId) {
@@ -391,6 +393,24 @@ class MainActivity : AppCompatActivity() {
             override fun onStartTrackingTouch(s: SeekBar?) {}
             override fun onStopTrackingTouch(s: SeekBar?) {}
         })
+
+        binding.seekBarMbRatio.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
+                val ratio = 1.0f + (p / 10.0f) // 1.0 to 11.0
+                AudioEngineLib.setMbCompression(ratio) 
+                settingsManager.saveFloat("mb_compression", ratio)
+            }
+            override fun onStartTrackingTouch(s: SeekBar?) {}
+            override fun onStopTrackingTouch(s: SeekBar?) {}
+        })
+
+        binding.swBeamforming.setOnCheckedChangeListener { _, isChecked ->
+            AudioEngineLib.setBeamforming(isChecked)
+            settingsManager.prefs.edit().putBoolean("beamforming", isChecked).apply()
+            if (isChecked) {
+                Toast.makeText(this, "AI Spatial Beamforming Active", Toast.LENGTH_SHORT).show()
+            }
+        }
 
         val eqSeekBars = listOf(binding.seekBarBand1, binding.seekBarBand2, binding.seekBarBand3, binding.seekBarBand4, binding.seekBarBand5)
         eqSeekBars.forEachIndexed { index, seekBar ->

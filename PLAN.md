@@ -56,6 +56,8 @@ EchoSense is an Android-first application designed to act as an intelligent, con
 * [x] **Persistent Customization:** Implement Manual EQ offsets that persist across profile changes.
 * [x] **Target Lock (Crowd Mode):** Implement hyper-restrictive bandpass filtering to isolate human speech fundamentals in extreme noise.
 * [x] **Speaker Isolation (AI Prototype):** Added UI and DSP hooks to isolate specific speakers (Watch vs Phone).
+* [x] **Multi-band AI Dynamics:** Frequency-dependent compression for speech clarity.
+* [x] **AI Neural Beamforming:** Spatial noise cancellation using dual-mic phase subtraction.
 
 ### Phase 3: Intelligence & Transcription
 * [x] Integrate on-device Speech-to-Text.

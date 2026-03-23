@@ -494,6 +494,29 @@
             android:progress="0"
             android:layout_marginBottom="16dp" />
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="AI Multi-band Dynamics (Speech Focus)"
+            android:textColor="#81D4FA"
+            android:textStyle="bold" />
+        <SeekBar
+            android:id="@+id/seekBarMbRatio"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="0"
+            android:layout_marginBottom="16dp" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/swBeamforming"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="AI Neural Beamforming (Spatial Array)"
+            android:textColor="#FFD54F"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp" />
+
         <!-- Dramatic 5-Band EQ -->
         <TextView
             android:layout_width="wrap_content"

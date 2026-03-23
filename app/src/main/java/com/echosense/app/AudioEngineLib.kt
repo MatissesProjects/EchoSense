@@ -30,6 +30,8 @@ object AudioEngineLib {
     external fun setSensorFusion(enabled: Boolean)
     external fun setTargetLock(enabled: Boolean)
     external fun setTargetSpeaker(speakerId: Int)
+    external fun setMbCompression(ratio: Float)
+    external fun setBeamforming(enabled: Boolean)
     external fun setEqualizerBandGain(bandIndex: Int, gain: Float)
     
     external fun getVolumeLevel(): Float
@@ -56,6 +58,8 @@ object AudioEngineLib {
         setSensorFusion(settings.prefs.getBoolean("sensor_fusion", false))
         setTargetLock(settings.prefs.getBoolean("target_lock", false))
         setTargetSpeaker(settings.getInt(AudioSettingsManager.KEY_TARGET_SPEAKER, -1))
+        setMbCompression(settings.getFloat("mb_compression", 1.0f))
+        setBeamforming(settings.prefs.getBoolean("beamforming", false))
         
         for (i in 0 until 5) {
             val gain = settings.getFloat("band_$i", 0.0f)

@@ -123,6 +123,8 @@ public:
     void setTargetLock(bool enabled);
     void setTargetSpeaker(int speakerId);
     void setFocusLevel(float level);
+    void setMbCompression(float ratio);
+    void setBeamforming(bool enabled);
     void setTransientSuppression(float strength);
     void learnNoise();
     float getVolumeLevel() const { return mCurrentVolume.load(); }
@@ -170,6 +172,8 @@ private:
     std::atomic<bool> mSensorFusionEnabled{false};
     std::atomic<bool> mTargetLockEnabled{false};
     std::atomic<int> mTargetSpeakerId{-1}; // -1 for none, 0 for Speaker A, 1 for Speaker B
+    std::atomic<bool> mBeamformingEnabled{false};
+    std::atomic<float> mMbCompressionRatio{1.0f};
     std::atomic<float> mFocusLevel{0.0f};
     std::atomic<float> mCurrentVolume{0.0f};
     std::atomic<float> mPhoneEnergy{0.0f};
