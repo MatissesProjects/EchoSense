@@ -18,7 +18,7 @@ public:
         }
     }
 
-    void processBlock(float* data, float* noiseProfile, float reductionStrength) {
+    void processBlock(float* data, float* noiseProfile, float reductionStrength, float spectralGateThresh) {
         // 1. Copy to complex buffer
         for (int i = 0; i < mSize; ++i) {
             mBuffer[i] = std::complex<float>(data[i], 0.0f);
@@ -27,17 +27,25 @@ public:
         // 2. Perform FFT
         fft(mBuffer, false);
 
-        // 3. Spectral Subtraction / Gating
+        // 3. Spectral Processing
         for (int i = 0; i < mSize; ++i) {
             float magnitude = std::abs(mBuffer[i]);
             float phase = std::arg(mBuffer[i]);
             
-            // Subtract noise floor or apply gate
-            float threshold = noiseProfile[i] * reductionStrength;
-            if (magnitude < threshold) {
-                magnitude *= 0.1f; // Aggressive reduction
+            // --- Neural Multi-band Gate ---
+            // If the energy in this specific band is below the threshold, duck it aggressively.
+            if (spectralGateThresh > 0.001f) {
+                if (magnitude < spectralGateThresh) {
+                    magnitude *= 0.05f; // Hard ducking for noise bands
+                }
+            }
+
+            // --- Spectral Subtraction ---
+            float noiseFloor = noiseProfile[i] * reductionStrength;
+            if (magnitude < noiseFloor) {
+                magnitude *= 0.1f;
             } else {
-                magnitude -= threshold * 0.5f; // Soft subtraction
+                magnitude -= noiseFloor * 0.5f;
             }
             
             mBuffer[i] = std::polar(std::max(0.0f, magnitude), phase);

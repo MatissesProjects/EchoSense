@@ -97,6 +97,7 @@ class MainActivity : AppCompatActivity() {
         binding.seekBarLpf.progress = ((settingsManager.getFloat("lpf_freq", 12000.0f) - 1000.0f) / 190.0f).toInt()
         binding.seekBarLimiter.progress = (settingsManager.getFloat("limiter_thresh", 0.9f) * 100).toInt()
         binding.seekBarSpectralReduction.progress = (settingsManager.getFloat("spectral_reduction", 0.0f) * 100).toInt()
+        binding.seekBarSpectralGate.progress = (settingsManager.getFloat("spectral_gate_thresh", 0.0f) * 5000).toInt()
         binding.seekBarNoiseGate.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_NOISE_GATE, 0.0f) * 200).toInt()
         binding.seekBarWatchGain.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_WATCH_GAIN, 2.0f) * 20).toInt()
         
@@ -197,6 +198,16 @@ class MainActivity : AppCompatActivity() {
                 val strength = p / 100.0f
                 AudioEngineLib.setSpectralReduction(strength) 
                 settingsManager.saveFloat("spectral_reduction", strength)
+            }
+            override fun onStartTrackingTouch(s: SeekBar?) {}
+            override fun onStopTrackingTouch(s: SeekBar?) {}
+        })
+
+        binding.seekBarSpectralGate.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
+                val thresh = p / 5000.0f // Scale for sensitive per-band gate
+                AudioEngineLib.setSpectralGateThreshold(thresh) 
+                settingsManager.saveFloat("spectral_gate_thresh", thresh)
             }
             override fun onStartTrackingTouch(s: SeekBar?) {}
             override fun onStopTrackingTouch(s: SeekBar?) {}

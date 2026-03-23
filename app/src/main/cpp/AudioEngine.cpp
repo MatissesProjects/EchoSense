@@ -88,6 +88,7 @@ void AudioEngine::setLpfFreq(float freq) { mLpfFreq.store(freq); mParamsChanged.
 void AudioEngine::setLimiterThreshold(float threshold) { mLimiterThreshold.store(threshold); }
 void AudioEngine::setNoiseGateThreshold(float threshold) { mNoiseGateThreshold.store(threshold); }
 void AudioEngine::setSpectralReduction(float strength) { mSpectralReductionStrength.store(strength); }
+void AudioEngine::setSpectralGateThreshold(float threshold) { mSpectralGateThreshold.store(threshold); }
 void AudioEngine::setMasterGain(float gain) { mMasterGain.store(gain); }
 
 void AudioEngine::setEqualizerBandGain(int bandIndex, float gainDb) {
@@ -277,15 +278,14 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
 
     // AI Spectral Processing
     float reduction = mSpectralReductionStrength.load();
+    float specGate = mSpectralGateThreshold.load();
+    
     if (mLearningNoise.load()) {
-        // Average spectral profile over ~1 second
         for (int i = 0; i < numFrames; i += FFT_SIZE) {
             if (i + FFT_SIZE <= numFrames) {
                 std::vector<std::complex<float>> block(FFT_SIZE);
                 for(int j=0; j<FFT_SIZE; j++) block[j] = std::complex<float>(outputBuffer[i+j], 0.0f);
-                
                 mSpectralProcessor->fft(block, false);
-                
                 for(int j=0; j<FFT_SIZE; j++) {
                     mNoiseProfile[j] = (mNoiseProfile[j] * mLearningCounter + std::abs(block[j])) / (mLearningCounter + 1);
                 }
@@ -296,10 +296,10 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
             mLearningNoise.store(false);
             __android_log_print(ANDROID_LOG_INFO, TAG, "Spectral Noise Learning Complete");
         }
-    } else if (reduction > 0.01f) {
+    } else if (reduction > 0.01f || specGate > 0.001f) {
         for (int i = 0; i < numFrames; i += FFT_SIZE) {
             if (i + FFT_SIZE <= numFrames) {
-                mSpectralProcessor->processBlock(outputBuffer + i, mNoiseProfile, reduction);
+                mSpectralProcessor->processBlock(outputBuffer + i, mNoiseProfile, reduction, specGate);
             }
         }
     }

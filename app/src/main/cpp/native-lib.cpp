@@ -74,6 +74,10 @@ JNIEXPORT void JNICALL JNI_METHOD(setSpectralReduction)(JNIEnv *env, jobject, jf
     if (audioEngine != nullptr) audioEngine->setSpectralReduction(strength);
 }
 
+JNIEXPORT void JNICALL JNI_METHOD(setSpectralGateThreshold)(JNIEnv *env, jobject, jfloat threshold) {
+    if (audioEngine != nullptr) audioEngine->setSpectralGateThreshold(threshold);
+}
+
 JNIEXPORT void JNICALL JNI_METHOD(learnNoise)(JNIEnv *env, jobject) {
     if (audioEngine != nullptr) audioEngine->learnNoise();
 }
