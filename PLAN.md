@@ -73,10 +73,10 @@ EchoSense is an Android-first application designed to act as an intelligent, con
 * [ ] **Environmental Fingerprinting:** Use FFT data to create and recognize unique acoustic signatures of different spaces.
 
 ### Phase 6: Spectral AI & Advanced DSP
-* [ ] **True FFT Integration:** Integrate a lightweight FFT library (KissFFT) into the C++ engine.
-* [ ] **Spectral Subtraction:** Implement a "Learn Noise" feature that subtracts the frequency-domain noise floor.
-* [ ] **Neural Multi-band Gate:** Implement 64-bin spectral gating to isolate vocals from overlapping background noise.
-* [ ] **Gemini Nano (AICore) Summarization:** Use the Pixel 9's on-device LLM to summarize conversation notes stored in the Room DB.
+* [x] **True FFT Integration:** Integrate a lightweight FFT library (custom implementation) into the C++ engine.
+* [x] **Spectral Subtraction:** Implement a "Learn Noise" feature that subtracts the frequency-domain noise floor.
+* [x] **Neural Multi-band Gate:** Implement 64-bin spectral gating to isolate vocals from overlapping background noise.
+* [x] **Gemini Nano (AICore) Summarization:** Use the Pixel 9's on-device LLM to summarize conversation notes stored in the Room DB.
 
 ## 6. Known Risks & Mitigations
 1.  **Audio Stream Collisions:** Android limits how many apps/services can access the mic simultaneously. Mitigated by carefully managing the `AudioRecord` lifecycle and building a robust internal audio mixer.
