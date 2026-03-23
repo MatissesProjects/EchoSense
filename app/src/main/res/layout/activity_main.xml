@@ -521,11 +521,17 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Bands: +/- 24dB"
+            android:text="Precision EQ: +/- 12dB"
             android:textColor="#888888"
             android:textSize="12sp"
             android:layout_marginBottom="8dp" />
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="200 Hz (Bass)"
+            android:textColor="#BBBBBB"
+            android:textSize="10sp" />
         <SeekBar
             android:id="@+id/seekBarBand1"
             android:layout_width="match_parent"
@@ -533,6 +539,13 @@
             android:max="200"
             android:progress="100"
             android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="500 Hz (Low-Mid)"
+            android:textColor="#BBBBBB"
+            android:textSize="10sp" />
         <SeekBar
             android:id="@+id/seekBarBand2"
             android:layout_width="match_parent"
@@ -540,6 +553,13 @@
             android:max="200"
             android:progress="100"
             android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="1.5 kHz (Speech Detail)"
+            android:textColor="#BBBBBB"
+            android:textSize="10sp" />
         <SeekBar
             android:id="@+id/seekBarBand3"
             android:layout_width="match_parent"
@@ -547,6 +567,13 @@
             android:max="200"
             android:progress="100"
             android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="3.0 kHz (Clarity)"
+            android:textColor="#BBBBBB"
+            android:textSize="10sp" />
         <SeekBar
             android:id="@+id/seekBarBand4"
             android:layout_width="match_parent"
@@ -554,6 +581,13 @@
             android:max="200"
             android:progress="100"
             android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="6.0 kHz (Presence)"
+            android:textColor="#BBBBBB"
+            android:textSize="10sp" />
         <SeekBar
             android:id="@+id/seekBarBand5"
             android:layout_width="match_parent"

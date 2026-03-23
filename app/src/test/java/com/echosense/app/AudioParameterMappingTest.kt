@@ -18,7 +18,7 @@ class AudioParameterMappingTest {
     @Test
     fun testEqScaling() {
         // Verify that UI progress (0-200) maps to -12dB to +12dB
-        // From MainActivity.kt: val gainDb = (progress - 100) * 0.12f
+        // Updated from 0.24f to 0.12f for precision
         val progressCenter = 100
         assertEquals(0.0f, (progressCenter - 100) * 0.12f, 0.01f)
 
@@ -31,20 +31,20 @@ class AudioParameterMappingTest {
 
     @Test
     fun testHpfScaling() {
-        // UI (0-200) maps to 50Hz to 1500Hz
-        // From MainActivity.kt: val freq = 50.0f + (progress * 7.25f)
+        // UI (0-100) maps to 50Hz to 550Hz
+        // From MainActivity.kt: val freq = p * 5.0f + 50.0f
         val progress = 100
-        val expected = 50.0f + (100 * 7.25f)
-        assertEquals(expected, 50.0f + (progress * 7.25f), 0.01f)
+        val expected = 550.0f
+        assertEquals(expected, progress * 5.0f + 50.0f, 0.01f)
     }
 
     @Test
     fun testLpfScaling() {
-        // UI (0-200) maps to 1000Hz to 18000Hz
-        // From MainActivity.kt: val freq = 1000.0f + (progress * 85.0f)
+        // UI (0-100) maps to 1000Hz to 20000Hz
+        // From MainActivity.kt: val freq = p * 190.0f + 1000.0f
         val progress = 100
-        val expected = 1000.0f + (100 * 85.0f)
-        assertEquals(expected, 1000.0f + (progress * 85.0f), 0.01f)
+        val expected = 20000.0f
+        assertEquals(expected, progress * 190.0f + 1000.0f, 0.01f)
     }
 
     @Test

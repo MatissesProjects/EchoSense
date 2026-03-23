@@ -132,11 +132,11 @@ class MainActivity : AppCompatActivity() {
             else -> binding.chipGroupSpeaker.check(R.id.chipSpeakerNone)
         }
 
-        binding.seekBarBand1.progress = (settingsManager.getFloat("band_0", 0.0f) / 0.24f + 100).toInt()
-        binding.seekBarBand2.progress = (settingsManager.getFloat("band_1", 0.0f) / 0.24f + 100).toInt()
-        binding.seekBarBand3.progress = (settingsManager.getFloat("band_2", 0.0f) / 0.24f + 100).toInt()
-        binding.seekBarBand4.progress = (settingsManager.getFloat("band_3", 0.0f) / 0.24f + 100).toInt()
-        binding.seekBarBand5.progress = (settingsManager.getFloat("band_4", 0.0f) / 0.24f + 100).toInt()
+        binding.seekBarBand1.progress = (settingsManager.getFloat("band_0", 0.0f) / 0.12f + 100).toInt()
+        binding.seekBarBand2.progress = (settingsManager.getFloat("band_1", 0.0f) / 0.12f + 100).toInt()
+        binding.seekBarBand3.progress = (settingsManager.getFloat("band_2", 0.0f) / 0.12f + 100).toInt()
+        binding.seekBarBand4.progress = (settingsManager.getFloat("band_3", 0.0f) / 0.12f + 100).toInt()
+        binding.seekBarBand5.progress = (settingsManager.getFloat("band_4", 0.0f) / 0.12f + 100).toInt()
     }
 
     private fun setupUI() {
@@ -416,7 +416,7 @@ class MainActivity : AppCompatActivity() {
         eqSeekBars.forEachIndexed { index, seekBar ->
             seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
-                    val gainDb = (p - 100) * 0.24f
+                    val gainDb = (p - 100) * 0.12f
                     AudioEngineLib.setEqualizerBandGain(index, gainDb)
                     settingsManager.saveFloat("band_$index", gainDb)
                 }
