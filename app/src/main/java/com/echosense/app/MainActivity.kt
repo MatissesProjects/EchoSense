@@ -154,6 +154,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnSummarize.setOnClickListener {
+            binding.tvTranscription.text = "AI is thinking... please wait."
             lifecycleScope.launch {
                 val summary = summarizationManager.getRecentNotesSummary()
                 binding.tvTranscription.text = summary

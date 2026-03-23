@@ -3,6 +3,8 @@ package com.echosense.app
 import android.content.Context
 import com.echosense.app.db.ConversationNote
 import com.echosense.app.db.EchoSenseDatabase
+import com.google.ai.client.generativeai.GenerativeModel
+import com.google.ai.client.generativeai.type.content
 import kotlinx.coroutines.flow.first
 import java.text.SimpleDateFormat
 import java.util.*
@@ -10,25 +12,38 @@ import java.util.*
 class SummarizationManager(private val context: Context) {
 
     private val db = EchoSenseDatabase.getDatabase(context)
+    
+    // Note: In a production app, the API key should be handled securely.
+    // For this on-device prototype, we assume the environment is set up for Gemini Nano/Flash.
+    private val generativeModel = GenerativeModel(
+        modelName = "gemini-1.5-flash", // Placeholder for Nano integration via AICore
+        apiKey = "TODO_USER_API_KEY"    // The user will need to provide this or we use AICore system service
+    )
 
     suspend fun getRecentNotesSummary(): String {
         val allNotes = db.conversationNoteDao().getAllNotes().first()
         if (allNotes.isEmpty()) return "No conversation history to summarize."
 
-        // Limit to last 20 notes for now to keep it manageable
-        val recentNotes = allNotes.take(20).reversed()
+        val recentNotes = allNotes.take(50).reversed()
         val conversationText = recentNotes.joinToString("\n") { 
             val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(it.timestamp))
             "[$time]: ${it.text}"
         }
 
-        return "--- CONVERSATION SUMMARY ---\n" +
-               "Notes captured: ${recentNotes.size}\n" +
-               "Last active: ${SimpleDateFormat("HH:mm:ss").format(Date(recentNotes.last().timestamp))}\n\n" +
-               "Full Transcript:\n$conversationText"
-               // Placeholder for Gemini Nano integration:
-               // val aiSummary = generativeModel.generateContent("Summarize this: $conversationText")
-               // return aiSummary.text
+        return try {
+            val response = generativeModel.generateContent(content {
+                text("You are an intelligent hearing assistant. Summarize the following conversation notes into a few bullet points highlighting key names, dates, or tasks mentioned. If it's just noise or fragments, say 'No clear conversation detected'.\n\n$conversationText")
+            })
+            
+            "--- AI CONTEXT SUMMARY ---\n" +
+            (response.text ?: "AI could not generate a summary.") +
+            "\n\n--- Full Transcript ---\n" +
+            conversationText
+        } catch (e: Exception) {
+            "--- CONVERSATION LOG ---\n" +
+            "AI Summarization unavailable (check connection/API key).\n\n" +
+            conversationText
+        }
     }
 
     suspend fun clearHistory() {
