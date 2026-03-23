@@ -245,11 +245,19 @@ void AudioEngine::autoTune() {
     mParamsChanged.store(true);
 }
 
+int AudioEngine::getDominantMic() const {
+    // Return 1 if watch is significantly louder than phone, else 0
+    return (mWatchEnergy.load() > mPhoneEnergy.load() * 1.2f) ? 1 : 0;
+}
+
 oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
     float *outputBuffer = static_cast<float *>(audioData);
     if (mParamsChanged.load()) updateFilters();
 
     float ambientRMS = 0.0f;
+    float phoneRMS = 0.0f;
+    float watchRMS = 0.0f;
+    
     bool fusion = mSensorFusionEnabled.load();
     InputSource source = mInputSource.load();
 
@@ -261,7 +269,9 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
             sumSq += s * s;
             if (source == InputSource::Watch) outputBuffer[i] = s;
         }
-        ambientRMS = sqrtf(sumSq / (float)numFrames);
+        watchRMS = sqrtf(sumSq / (float)numFrames);
+        mWatchEnergy.store(watchRMS);
+        ambientRMS = watchRMS;
     }
 
     if (source != InputSource::Watch) {
@@ -271,8 +281,14 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
                 int32_t start = result ? result.value() : 0;
                 for (int i = start; i < numFrames; i++) outputBuffer[i] = 0.0f;
             }
+            
+            float sumSq = 0;
+            for (int i = 0; i < numFrames; i++) sumSq += outputBuffer[i] * outputBuffer[i];
+            phoneRMS = sqrtf(sumSq / (float)numFrames);
+            mPhoneEnergy.store(phoneRMS);
         } else {
             for (int i = 0; i < numFrames; i++) outputBuffer[i] = 0.0f;
+            mPhoneEnergy.store(0.0f);
         }
     }
 

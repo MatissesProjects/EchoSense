@@ -106,6 +106,10 @@ JNIEXPORT jfloat JNICALL JNI_METHOD(getVolumeLevel)(JNIEnv *env, jobject) {
     return (audioEngine != nullptr) ? audioEngine->getVolumeLevel() : 0.0f;
 }
 
+JNIEXPORT jint JNICALL JNI_METHOD(getDominantMic)(JNIEnv *env, jobject) {
+    return (audioEngine != nullptr) ? audioEngine->getDominantMic() : 0;
+}
+
 JNIEXPORT void JNICALL JNI_METHOD(getFftData)(JNIEnv *env, jobject, jfloatArray output) {
     if (audioEngine != nullptr) {
         jfloat *c_output = env->GetFloatArrayElements(output, NULL);

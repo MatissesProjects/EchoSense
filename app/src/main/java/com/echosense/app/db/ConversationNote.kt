@@ -7,7 +7,8 @@ import androidx.room.PrimaryKey
 data class ConversationNote(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val text: String,
+    val speakerLabel: String = "Unknown", // Added for diarization
     val timestamp: Long = System.currentTimeMillis(),
-    val audioProfileId: Int? = null, // Which profile was active during this note
-    val summary: String? = null // For Phase 3 AICore integration
+    val audioProfileId: Int? = null,
+    val summary: String? = null
 )

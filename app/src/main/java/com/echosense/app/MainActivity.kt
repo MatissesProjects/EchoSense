@@ -436,8 +436,14 @@ class MainActivity : AppCompatActivity() {
                         binding.tvTranscription.text = text
                         
                         lifecycleScope.launch(Dispatchers.IO) {
+                            val dominantMic = AudioEngineLib.getDominantMic()
+                            val speaker = if (dominantMic == 1) "Speaker A (Watch)" else "Speaker B (Phone)"
+                            
                             val db = EchoSenseDatabase.getDatabase(this@MainActivity)
-                            db.conversationNoteDao().insertNote(ConversationNote(text = text))
+                            db.conversationNoteDao().insertNote(ConversationNote(
+                                text = text,
+                                speakerLabel = speaker
+                            ))
                         }
                     }
                     // Restart for continuous capture

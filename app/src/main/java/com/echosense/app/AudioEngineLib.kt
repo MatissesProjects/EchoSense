@@ -31,6 +31,7 @@ object AudioEngineLib {
     external fun setEqualizerBandGain(bandIndex: Int, gain: Float)
     
     external fun getVolumeLevel(): Float
+    external fun getDominantMic(): Int
     external fun getFftData(output: FloatArray)
     external fun getEqCurveData(output: FloatArray)
     external fun autoTune()

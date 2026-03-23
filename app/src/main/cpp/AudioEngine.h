@@ -123,6 +123,7 @@ public:
     void setTargetLock(bool enabled);
     void learnNoise();
     float getVolumeLevel() const { return mCurrentVolume.load(); }
+    int getDominantMic() const; // Returns 0 for Phone, 1 for Watch
 
     void getFftData(float* output, int size);
     void getEqCurveData(float* output, int size);
@@ -166,6 +167,8 @@ private:
     std::atomic<bool> mSensorFusionEnabled{false};
     std::atomic<bool> mTargetLockEnabled{false};
     std::atomic<float> mCurrentVolume{0.0f};
+    std::atomic<float> mPhoneEnergy{0.0f};
+    std::atomic<float> mWatchEnergy{0.0f};
     std::atomic<bool> mParamsChanged{true};
 
     float mCurrentRampGain = 0.0f;
