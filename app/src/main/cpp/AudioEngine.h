@@ -121,6 +121,7 @@ public:
     void setProfile(AudioProfile profile);
     void setSensorFusion(bool enabled);
     void setTargetLock(bool enabled);
+    void setFocusLevel(float level);
     void setTransientSuppression(float strength);
     void learnNoise();
     float getVolumeLevel() const { return mCurrentVolume.load(); }
@@ -167,6 +168,7 @@ private:
     std::atomic<AudioProfile> mAudioProfile{AudioProfile::Custom};
     std::atomic<bool> mSensorFusionEnabled{false};
     std::atomic<bool> mTargetLockEnabled{false};
+    std::atomic<float> mFocusLevel{0.0f};
     std::atomic<float> mCurrentVolume{0.0f};
     std::atomic<float> mPhoneEnergy{0.0f};
     std::atomic<float> mWatchEnergy{0.0f};
