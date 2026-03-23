@@ -41,6 +41,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var recognizerIntent: Intent
     private var visualizerJob: Job? = null
     private var isDimmed = false
+    private var isListeningActive = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -367,28 +368,49 @@ class MainActivity : AppCompatActivity() {
             }
 
             speechRecognizer?.setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) {}
+                override fun onReadyForSpeech(params: Bundle?) {
+                    isListeningActive = true
+                }
                 override fun onBeginningOfSpeech() {}
                 override fun onRmsChanged(rmsdB: Float) {}
                 override fun onBufferReceived(buffer: ByteArray?) {}
-                override fun onEndOfSpeech() {}
-                override fun onError(error: Int) {
+                override fun onEndOfSpeech() {
+                    // Standard recognizer stops here, we need to restart
                     if (AudioEngineLib.isAudioEngineRunning()) {
+                        lifecycleScope.launch { delay(100); startListening() }
+                    }
+                }
+                override fun onError(error: Int) {
+                    isListeningActive = false
+                    val message = when (error) {
+                        SpeechRecognizer.ERROR_AUDIO -> "Audio error"
+                        SpeechRecognizer.ERROR_CLIENT -> "Client error"
+                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Permissions error"
+                        SpeechRecognizer.ERROR_NETWORK -> "Network error"
+                        SpeechRecognizer.ERROR_NO_MATCH -> "No match"
+                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Busy"
+                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Timeout"
+                        else -> "Unknown error"
+                    }
+                    
+                    // Don't restart on fatal errors (busy/permissions), but do on timeouts
+                    if (AudioEngineLib.isAudioEngineRunning() && error != SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
                         lifecycleScope.launch { delay(500); startListening() }
                     }
                 }
                 override fun onResults(results: Bundle?) {
+                    isListeningActive = false
                     val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     if (!matches.isNullOrEmpty()) {
                         val text = matches[0]
                         binding.tvTranscription.text = text
                         
-                        // Save to database
                         lifecycleScope.launch(Dispatchers.IO) {
                             val db = EchoSenseDatabase.getDatabase(this@MainActivity)
                             db.conversationNoteDao().insertNote(ConversationNote(text = text))
                         }
                     }
+                    // Restart for continuous capture
                     if (AudioEngineLib.isAudioEngineRunning()) startListening()
                 }
                 override fun onPartialResults(partialResults: Bundle?) {
@@ -401,11 +423,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startListening() {
-        try { speechRecognizer?.startListening(recognizerIntent) } catch (e: Exception) {}
+        if (!AudioEngineLib.isAudioEngineRunning()) return
+        
+        runOnUiThread {
+            try {
+                speechRecognizer?.startListening(recognizerIntent)
+            } catch (e: Exception) {
+                isListeningActive = false
+            }
+        }
     }
 
     private fun stopListening() {
+        isListeningActive = false
         speechRecognizer?.stopListening()
+        speechRecognizer?.cancel()
     }
 
     private fun startVisualizer() {
