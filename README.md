@@ -54,3 +54,10 @@ adb -s <watch_ip> install -r wear/build/outputs/apk/debug/wear-debug.apk
 - **Phase 5 (Intelligent Scene Awareness):**
     - **Adaptive Scene Detection:** Automatic switching based on acoustic fingerprinting.
     - **Priority Profiles:** Speech detection priority over ambient music.
+
+
+## Local
+
+C:\Users\matis\AppData\Local\Android\Sdk\platform-tools\adb.exe connect 192.168.4.134:44759;
+     C:\Users\matis\AppData\Local\Android\Sdk\platform-tools\adb.exe connect 192.168.4.159:41209;
+     ./gradlew installDebug

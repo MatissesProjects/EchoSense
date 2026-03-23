@@ -55,6 +55,7 @@ EchoSense is an Android-first application designed to act as an intelligent, con
 * [x] Implement DSP Serial Routing, Profiles (Voice/Music/TV), and Noise Gate Hysteresis.
 * [x] **Persistent Customization:** Implement Manual EQ offsets that persist across profile changes.
 * [x] **Target Lock (Crowd Mode):** Implement hyper-restrictive bandpass filtering to isolate human speech fundamentals in extreme noise.
+* [x] **Speaker Isolation (AI Prototype):** Added UI and DSP hooks to isolate specific speakers (Watch vs Phone).
 
 ### Phase 3: Intelligence & Transcription
 * [x] Integrate on-device Speech-to-Text.

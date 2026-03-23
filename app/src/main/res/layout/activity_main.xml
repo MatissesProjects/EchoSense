@@ -64,7 +64,49 @@
             android:text="Target Lock (Crowd Isolation)"
             android:textColor="#FF4081"
             android:textStyle="bold"
-            android:layout_marginBottom="16dp" />
+            android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="16dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="AI Speaker Isolation"
+                android:textColor="#B2FF59"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp" />
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/chipGroupSpeaker"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:singleSelection="true">
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipSpeakerNone"
+                    style="@style/Widget.MaterialComponents.Chip.Choice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="None"
+                    android:checked="true"
+                    android:textColor="#FFFFFF" />
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipSpeakerA"
+                    style="@style/Widget.MaterialComponents.Chip.Choice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Speaker A (Watch)"
+                    android:textColor="#FFFFFF" />
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipSpeakerB"
+                    style="@style/Widget.MaterialComponents.Chip.Choice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Speaker B (Phone)"
+                    android:textColor="#FFFFFF" />
+            </com.google.android.material.chip.ChipGroup>
+        </LinearLayout>
 
         <!-- Spectral AI Section -->
         <TextView

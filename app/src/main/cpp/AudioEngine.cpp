@@ -136,6 +136,10 @@ void AudioEngine::setTargetLock(bool enabled) {
     mParamsChanged.store(true);
 }
 
+void AudioEngine::setTargetSpeaker(int speakerId) {
+    mTargetSpeakerId.store(speakerId);
+}
+
 void AudioEngine::setTransientSuppression(float strength) {
     mTransientSuppressionStrength.store(strength);
 }
@@ -190,6 +194,23 @@ void AudioEngine::updateFilters() {
 inline float AudioEngine::processSample(float sample) {
     if (mCurrentRampGain < 1.0f) mCurrentRampGain += mRampStep;
     float out = sample * mPreAmpGain.load();
+
+    // --- Speaker Isolation Placeholder ---
+    int targetId = mTargetSpeakerId.load();
+    if (targetId != -1) {
+        // If we are targeting Speaker A (Watch=0) or B (Phone=1), boost if they are dominant.
+        // DominantMic: 0 = Phone, 1 = Watch
+        int dominant = getDominantMic();
+        // UI IDs might be 0 for A (Watch), 1 for B (Phone)
+        // Adjust logic: if targetId matches dominant, boost.
+        // Assuming Speaker A is Watch (1) and Speaker B is Phone (0) for now.
+        int mappedTarget = (targetId == 0) ? 1 : 0; 
+        if (dominant == mappedTarget) {
+            out *= 2.0f; // 6dB extra boost for target speaker
+        } else {
+            out *= 0.5f; // 6dB reduction for non-target speaker
+        }
+    }
 
     float absOut = std::abs(out);
     if (absOut > mNoiseGateThreshold.load()) {

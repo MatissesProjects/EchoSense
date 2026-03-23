@@ -98,6 +98,10 @@ JNIEXPORT void JNICALL JNI_METHOD(setTargetLock)(JNIEnv *env, jobject, jboolean 
     if (audioEngine != nullptr) audioEngine->setTargetLock(enabled);
 }
 
+JNIEXPORT void JNICALL JNI_METHOD(setTargetSpeaker)(JNIEnv *env, jobject, jint speakerId) {
+    if (audioEngine != nullptr) audioEngine->setTargetSpeaker(speakerId);
+}
+
 JNIEXPORT void JNICALL JNI_METHOD(setTransientSuppression)(JNIEnv *env, jobject, jfloat strength) {
     if (audioEngine != nullptr) audioEngine->setTransientSuppression(strength);
 }

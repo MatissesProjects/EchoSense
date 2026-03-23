@@ -19,6 +19,7 @@ class AudioSettingsManager(context: Context) {
         const val KEY_WATCH_GAIN = "watch_gain"
         const val KEY_PROFILE = "audio_profile"
         const val KEY_MIC_SOURCE = "mic_source"
+        const val KEY_TARGET_SPEAKER = "target_speaker"
     }
 
     fun saveFloat(key: String, value: Float) {

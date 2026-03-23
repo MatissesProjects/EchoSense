@@ -123,6 +123,13 @@ class MainActivity : AppCompatActivity() {
         binding.swSensorFusion.isChecked = settingsManager.prefs.getBoolean("sensor_fusion", false)
         binding.swTargetLock.isChecked = settingsManager.prefs.getBoolean("target_lock", false)
 
+        val speakerId = settingsManager.getInt(AudioSettingsManager.KEY_TARGET_SPEAKER, -1)
+        when (speakerId) {
+            0 -> binding.chipGroupSpeaker.check(R.id.chipSpeakerA)
+            1 -> binding.chipGroupSpeaker.check(R.id.chipSpeakerB)
+            else -> binding.chipGroupSpeaker.check(R.id.chipSpeakerNone)
+        }
+
         binding.seekBarBand1.progress = (settingsManager.getFloat("band_0", 0.0f) / 0.24f + 100).toInt()
         binding.seekBarBand2.progress = (settingsManager.getFloat("band_1", 0.0f) / 0.24f + 100).toInt()
         binding.seekBarBand3.progress = (settingsManager.getFloat("band_2", 0.0f) / 0.24f + 100).toInt()
@@ -189,6 +196,21 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        binding.chipGroupSpeaker.setOnCheckedStateChangeListener { _, checkedIds ->
+            val checkedId = if (checkedIds.isNotEmpty()) checkedIds[0] else View.NO_ID
+            val speakerId = when (checkedId) {
+                R.id.chipSpeakerA -> 0
+                R.id.chipSpeakerB -> 1
+                else -> -1
+            }
+            AudioEngineLib.setTargetSpeaker(speakerId)
+            settingsManager.saveInt(AudioSettingsManager.KEY_TARGET_SPEAKER, speakerId)
+            
+            if (speakerId != -1) {
+                Toast.makeText(this, "Isolating Speaker ${if(speakerId==0) "A" else "B"}", Toast.LENGTH_SHORT).show()
+            }
+        }
+
         binding.btnLearnNoise.setOnClickListener {
             AudioEngineLib.learnNoise()
             Toast.makeText(this, "Learning Environment Noise... (Keep Quiet)", Toast.LENGTH_LONG).show()
@@ -214,7 +236,8 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(s: SeekBar?) {}
         })
 
-        binding.chipGroupProfile.setOnCheckedChangeListener { _, checkedId ->
+        binding.chipGroupProfile.setOnCheckedStateChangeListener { _, checkedIds ->
+            val checkedId = if (checkedIds.isNotEmpty()) checkedIds[0] else View.NO_ID
             val p = when (checkedId) {
                 R.id.chipProfileVoice -> 0
                 R.id.chipProfileMusic -> 1
@@ -423,16 +446,6 @@ class MainActivity : AppCompatActivity() {
                 }
                 override fun onError(error: Int) {
                     isListeningActive = false
-                    val message = when (error) {
-                        SpeechRecognizer.ERROR_AUDIO -> "Audio error"
-                        SpeechRecognizer.ERROR_CLIENT -> "Client error"
-                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Permissions error"
-                        SpeechRecognizer.ERROR_NETWORK -> "Network error"
-                        SpeechRecognizer.ERROR_NO_MATCH -> "No match"
-                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Busy"
-                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Timeout"
-                        else -> "Unknown error"
-                    }
                     
                     // Don't restart on fatal errors (busy/permissions), but do on timeouts
                     if (AudioEngineLib.isAudioEngineRunning() && error != SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
