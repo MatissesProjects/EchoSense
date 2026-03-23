@@ -32,6 +32,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var settingsManager: AudioSettingsManager
+    private lateinit var summarizationManager: SummarizationManager
     private val PERMISSION_REQUEST_CODE = 1
     
     private val fftData = FloatArray(64)
@@ -48,6 +49,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         settingsManager = AudioSettingsManager(this)
+        summarizationManager = SummarizationManager(this)
 
         setupUI()
         restoreUiFromSettings()
@@ -149,6 +151,22 @@ class MainActivity : AppCompatActivity() {
             AudioEngineLib.autoTune()
             binding.chipGroupProfile.check(R.id.chipProfileCustom)
             Toast.makeText(this, "AI Adaptive Tuning Applied", Toast.LENGTH_SHORT).show()
+        }
+
+        binding.btnSummarize.setOnClickListener {
+            lifecycleScope.launch {
+                val summary = summarizationManager.getRecentNotesSummary()
+                binding.tvTranscription.text = summary
+                Toast.makeText(this@MainActivity, "Conversation Summarized", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        binding.btnClearHistory.setOnClickListener {
+            lifecycleScope.launch {
+                summarizationManager.clearHistory()
+                binding.tvTranscription.text = "History Cleared."
+                Toast.makeText(this@MainActivity, "Database Cleared", Toast.LENGTH_SHORT).show()
+            }
         }
 
         binding.swTargetLock.setOnCheckedChangeListener { _, isChecked ->
