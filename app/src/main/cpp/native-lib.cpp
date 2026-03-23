@@ -98,6 +98,10 @@ JNIEXPORT void JNICALL JNI_METHOD(setTargetLock)(JNIEnv *env, jobject, jboolean 
     if (audioEngine != nullptr) audioEngine->setTargetLock(enabled);
 }
 
+JNIEXPORT void JNICALL JNI_METHOD(setTransientSuppression)(JNIEnv *env, jobject, jfloat strength) {
+    if (audioEngine != nullptr) audioEngine->setTransientSuppression(strength);
+}
+
 JNIEXPORT void JNICALL JNI_METHOD(setEqualizerBandGain)(JNIEnv *env, jobject, jint bandIndex, jfloat gain) {
     if (audioEngine != nullptr) audioEngine->setEqualizerBandGain(bandIndex, gain);
 }

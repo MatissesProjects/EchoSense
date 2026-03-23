@@ -96,6 +96,7 @@ class MainActivity : AppCompatActivity() {
         binding.seekBarHpf.progress = (settingsManager.getFloat("hpf_freq", 150.0f) / 5.0f).toInt()
         binding.seekBarLpf.progress = ((settingsManager.getFloat("lpf_freq", 12000.0f) - 1000.0f) / 190.0f).toInt()
         binding.seekBarLimiter.progress = (settingsManager.getFloat("limiter_thresh", 0.9f) * 100).toInt()
+        binding.seekBarTransient.progress = (settingsManager.getFloat("transient_suppression", 0.0f) * 100).toInt()
         binding.seekBarSpectralReduction.progress = (settingsManager.getFloat("spectral_reduction", 0.0f) * 100).toInt()
         binding.seekBarSpectralGate.progress = (settingsManager.getFloat("spectral_gate_thresh", 0.0f) * 5000).toInt()
         binding.seekBarNoiseGate.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_NOISE_GATE, 0.0f) * 200).toInt()
@@ -343,6 +344,16 @@ class MainActivity : AppCompatActivity() {
                 val thresh = p / 100.0f // 0.0 to 1.0
                 AudioEngineLib.setLimiterThreshold(thresh) 
                 settingsManager.saveFloat("limiter_thresh", thresh)
+            }
+            override fun onStartTrackingTouch(s: SeekBar?) {}
+            override fun onStopTrackingTouch(s: SeekBar?) {}
+        })
+
+        binding.seekBarTransient.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
+                val strength = p / 100.0f // 0.0 to 1.0
+                AudioEngineLib.setTransientSuppression(strength) 
+                settingsManager.saveFloat("transient_suppression", strength)
             }
             override fun onStartTrackingTouch(s: SeekBar?) {}
             override fun onStopTrackingTouch(s: SeekBar?) {}

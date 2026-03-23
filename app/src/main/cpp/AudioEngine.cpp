@@ -136,6 +136,10 @@ void AudioEngine::setTargetLock(bool enabled) {
     mParamsChanged.store(true);
 }
 
+void AudioEngine::setTransientSuppression(float strength) {
+    mTransientSuppressionStrength.store(strength);
+}
+
 void AudioEngine::learnNoise() {
     for (int i = 0; i < FFT_SIZE; i++) mNoiseProfile[i] = 0.0f;
     mLearningCounter = 0;
@@ -202,6 +206,22 @@ inline float AudioEngine::processSample(float sample) {
     for (int i = 0; i < 5; ++i) out = mEQBands[i].process(out);
     
     out *= mMasterGain.load() * mCurrentRampGain;
+
+    // --- Transient Suppressor (Keyboard Click Killer) ---
+    float suppressionStrength = mTransientSuppressionStrength.load();
+    if (suppressionStrength > 0.01f) {
+        float absOut = std::abs(out);
+        float attack = 0.5f;
+        float release = 0.001f;
+        if (absOut > mEnergyEnvelope) mEnergyEnvelope = mEnergyEnvelope * (1.0f - attack) + absOut * attack;
+        else mEnergyEnvelope = mEnergyEnvelope * (1.0f - release) + absOut * release;
+
+        if (absOut > mEnergyEnvelope * (2.0f / suppressionStrength) && absOut > 0.02f) {
+            mSuppressionGain = 0.0f; 
+        }
+        if (mSuppressionGain < 1.0f) mSuppressionGain += 0.05f;
+        out *= mSuppressionGain;
+    }
 
     float limit = mLimiterThreshold.load();
     if (out > limit) out = limit + (out - limit) * 0.1f;

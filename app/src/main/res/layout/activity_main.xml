@@ -414,6 +414,20 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:text="Keyboard Click Killer (Transient Suppressor)"
+            android:textColor="#FFEB3B"
+            android:textStyle="bold" />
+        <SeekBar
+            android:id="@+id/seekBarTransient"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="0"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:text="Clap Protection (Sudden Noise Limiter)"
             android:textColor="#FF5252"
             android:textStyle="bold" />

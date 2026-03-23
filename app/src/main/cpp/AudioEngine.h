@@ -121,6 +121,7 @@ public:
     void setProfile(AudioProfile profile);
     void setSensorFusion(bool enabled);
     void setTargetLock(bool enabled);
+    void setTransientSuppression(float strength);
     void learnNoise();
     float getVolumeLevel() const { return mCurrentVolume.load(); }
     int getDominantMic() const; // Returns 0 for Phone, 1 for Watch
@@ -170,6 +171,10 @@ private:
     std::atomic<float> mPhoneEnergy{0.0f};
     std::atomic<float> mWatchEnergy{0.0f};
     std::atomic<bool> mParamsChanged{true};
+
+    std::atomic<float> mTransientSuppressionStrength{0.0f};
+    float mEnergyEnvelope = 0.0f;
+    float mSuppressionGain = 1.0f;
 
     float mCurrentRampGain = 0.0f;
     const float mRampStep = 0.001f;
