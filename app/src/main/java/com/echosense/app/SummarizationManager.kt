@@ -9,17 +9,15 @@ import kotlinx.coroutines.flow.first
 import java.text.SimpleDateFormat
 import java.util.*
 
-class SummarizationManager(private val context: Context) {
-
-    private val db = EchoSenseDatabase.getDatabase(context)
-    
-    // Note: In a production app, the API key should be handled securely.
-    // For this on-device prototype, we assume the environment is set up for Gemini Nano/Flash.
-    private val generativeModel = GenerativeModel(
+class SummarizationManager(
+    private val context: Context,
+    private val generativeModel: GenerativeModel = GenerativeModel(
         modelName = "gemini-1.5-flash", // Placeholder for Nano integration via AICore
         apiKey = "TODO_USER_API_KEY"    // The user will need to provide this or we use AICore system service
     )
+) {
 
+    private val db = EchoSenseDatabase.getDatabase(context)
     suspend fun getRecentNotesSummary(): String {
         val allNotes = db.conversationNoteDao().getAllNotes().first()
         if (allNotes.isEmpty()) return "No conversation history to summarize."

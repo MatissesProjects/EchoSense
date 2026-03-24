@@ -15,12 +15,18 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+import com.google.ai.client.generativeai.GenerativeModel
+import com.google.ai.client.generativeai.type.GenerateContentResponse
+import org.mockito.kotlin.*
+import kotlinx.coroutines.runBlocking
+
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
 class SummarizationManagerTest {
 
     private lateinit var db: EchoSenseDatabase
     private lateinit var summarizationManager: SummarizationManager
+    private lateinit var mockGenerativeModel: GenerativeModel
 
     @Before
     fun setup() {
@@ -34,7 +40,8 @@ class SummarizationManagerTest {
         field.isAccessible = true
         field.set(null, db)
         
-        summarizationManager = SummarizationManager(context)
+        mockGenerativeModel = mock()
+        summarizationManager = SummarizationManager(context, mockGenerativeModel)
     }
 
     @After
@@ -50,21 +57,37 @@ class SummarizationManagerTest {
     fun testEmptySummary() = runBlocking {
         val summary = summarizationManager.getRecentNotesSummary()
         assertTrue(summary.contains("No conversation history"))
+        verifyNoInteractions(mockGenerativeModel)
     }
 
     @Test
-    fun testSummaryWithNotes() = runBlocking {
+    fun testSummaryWithNotesSuccess() = runBlocking {
         val dao = db.conversationNoteDao()
-        dao.insertNote(ConversationNote(text = "Hello, how are you?", timestamp = System.currentTimeMillis()))
-        dao.insertNote(ConversationNote(text = "I am fine, thanks.", timestamp = System.currentTimeMillis() + 1000))
+        dao.insertNote(ConversationNote(text = "Hello", timestamp = 1000))
+        
+        val mockResponse: GenerateContentResponse = mock {
+            on { text } doReturn "This is a summary"
+        }
+        whenever(mockGenerativeModel.generateContent(any())).thenReturn(mockResponse)
         
         val summary = summarizationManager.getRecentNotesSummary()
         
-        // Since we are not actually calling the real AI (or if we are, it might fail/be mocked), 
-        // we check if the full transcript is at least present.
-        assertTrue(summary.contains("Hello, how are you?"))
-        assertTrue(summary.contains("I am fine, thanks."))
-        // It should contain either the AI summary header or the fallback header
-        assertTrue(summary.contains("CONTEXT SUMMARY") || summary.contains("CONVERSATION LOG"))
+        assertTrue(summary.contains("--- AI CONTEXT SUMMARY ---"))
+        assertTrue(summary.contains("This is a summary"))
+        assertTrue(summary.contains("Hello"))
+    }
+
+    @Test
+    fun testSummaryWithNotesFailure() = runBlocking {
+        val dao = db.conversationNoteDao()
+        dao.insertNote(ConversationNote(text = "Hello", timestamp = 1000))
+        
+        whenever(mockGenerativeModel.generateContent(any())).thenThrow(RuntimeException("API Error"))
+        
+        val summary = summarizationManager.getRecentNotesSummary()
+        
+        assertTrue(summary.contains("--- CONVERSATION LOG ---"))
+        assertTrue(summary.contains("AI Summarization unavailable"))
+        assertTrue(summary.contains("Hello"))
     }
 }
