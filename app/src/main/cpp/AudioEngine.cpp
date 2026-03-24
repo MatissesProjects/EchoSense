@@ -2,7 +2,10 @@
 #include <android/log.h>
 #include <cmath>
 #include <algorithm>
+
+#if defined(__ARM_NEON)
 #include <arm_neon.h>
+#endif
 
 #define TAG "AudioEngine"
 
@@ -192,7 +195,7 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
     bool fusion = mSensorFusionEnabled.load();
     InputSource source = mInputSource.load();
 
-    // 1. Acquire Input Data (Resampled or Direct)
+    // 1. Acquire Input Data
     if (source == InputSource::Watch || fusion) {
         float sumSq = 0;
         float remoteGain = mRemoteGain.load();
@@ -223,12 +226,13 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
         }
     }
 
-    // --- AI Beamforming (Software Array) ---
+    // --- AI Beamforming ---
     if (mBeamformingEnabled.load() && fusion && source != InputSource::Watch) {
         float remoteGain = mRemoteGain.load() * 0.5f; 
         mRemoteReadPos = (mRemoteReadPos - numFrames + REMOTE_BUFFER_SIZE) % REMOTE_BUFFER_SIZE;
         
         int i = 0;
+#if defined(__ARM_NEON)
         float32x4_t vGain = vdupq_n_f32(remoteGain);
         for (; i <= numFrames - 4; i += 4) {
             float32x4_t vPhone = vld1q_f32(outputBuffer + i);
@@ -238,6 +242,7 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
             float32x4_t vResult = vsubq_f32(vPhone, vmulq_f32(vNoise, vGain));
             vst1q_f32(outputBuffer + i, vResult);
         }
+#endif
         for (; i < numFrames; i++) {
             float noiseRef = mRemoteBuffer[(mRemoteReadPos + i) % REMOTE_BUFFER_SIZE] * remoteGain;
             outputBuffer[i] -= noiseRef;
@@ -245,10 +250,9 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
         mRemoteReadPos = (mRemoteReadPos + numFrames) % REMOTE_BUFFER_SIZE;
     }
 
-    // 2. Pre-Processing Gain Fusion (PreAmp * Master)
+    // 2. Pre-Processing Gain Fusion
     float combinedGain = mPreAmpGain.load() * mMasterGain.load();
     
-    // --- Speaker Isolation ---
     int targetId = mTargetSpeakerId.load();
     if (targetId != -1) {
         int dominant = getDominantMic();
@@ -263,42 +267,45 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
     }
 
     int i = 0;
+#if defined(__ARM_NEON)
     float32x4_t vCombinedGain = vdupq_n_f32(combinedGain);
     for (; i <= numFrames - 4; i += 4) {
         float32x4_t vIn = vld1q_f32(outputBuffer + i);
         vst1q_f32(outputBuffer + i, vmulq_f32(vIn, vCombinedGain));
     }
+#endif
     for (; i < numFrames; i++) outputBuffer[i] *= combinedGain;
 
-    // 3. AI Spectral Processing (Block-based)
+    // 3. AI Spectral Processing
     float reduction = mSpectralReductionStrength.load();
     float specGate = mSpectralGateThreshold.load();
     if (reduction > 0.01f || specGate > 0.001f) {
-        for (int i = 0; i < numFrames; i += FFT_SIZE) {
-            if (i + FFT_SIZE <= numFrames) {
-                mSpectralProcessor->processBlock(outputBuffer + i, mNoiseProfile, reduction, specGate);
+        for (int j = 0; j < numFrames; j += FFT_SIZE) {
+            if (j + FFT_SIZE <= numFrames) {
+                mSpectralProcessor->processBlock(outputBuffer + j, mNoiseProfile, reduction, specGate);
             }
         }
     }
 
-    // 4. Biquad Cascade (Block-based for Cache Efficiency)
+    // 4. Biquad Cascade
     mHighPass.processBlock(outputBuffer, numFrames);
     mLowPass.processBlock(outputBuffer, numFrames);
     mVoiceFilters[0].processBlock(outputBuffer, numFrames);
     mVoiceFilters[1].processBlock(outputBuffer, numFrames);
     for (int b = 0; b < 5; b++) mEQBands[b].processBlock(outputBuffer, numFrames);
 
-    // 5. Dynamics & Protection (Final Pass)
+    // 5. Dynamics & Protection
     float limit = mLimiterThreshold.load();
+    i = 0;
+#if defined(__ARM_NEON)
     float32x4_t vLimit = vdupq_n_f32(limit);
     float32x4_t vNegLimit = vdupq_n_f32(-limit);
-    
-    i = 0;
     for (; i <= numFrames - 4; i += 4) {
         float32x4_t vOut = vld1q_f32(outputBuffer + i);
         vOut = vmaxq_f32(vNegLimit, vminq_f32(vLimit, vOut));
         vst1q_f32(outputBuffer + i, vOut);
     }
+#endif
     for (; i < numFrames; i++) {
         outputBuffer[i] = std::clamp(outputBuffer[i], -limit, limit);
     }
