@@ -25,17 +25,29 @@ enum class AudioProfile {
     Custom = 3
 };
 
-// Biquad Filter Structure
+// Biquad Filter Structure - Optimized Direct Form II Transposed
 struct Biquad {
     float b0, b1, b2, a1, a2;
-    float x1, x2, y1, y2;
+    float z1, z2; // State variables
 
-    Biquad() : b0(1), b1(0), b2(0), a1(0), a2(0), x1(0), x2(0), y1(0), y2(0) {}
+    Biquad() : b0(1), b1(0), b2(0), a1(0), a2(0), z1(0), z2(0) {}
 
     inline float process(float in) {
-        float out = b0 * in + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
-        x2 = x1; x1 = in; y2 = y1; y1 = out;
+        float out = in * b0 + z1;
+        z1 = in * b1 - out * a1 + z2;
+        z2 = in * b2 - out * a2;
         return out;
+    }
+    
+    // Process a block of samples (allows compiler auto-vectorization)
+    void processBlock(float* data, int32_t numFrames) {
+        for (int i = 0; i < numFrames; i++) {
+            float in = data[i];
+            float out = in * b0 + z1;
+            z1 = in * b1 - out * a1 + z2;
+            z2 = in * b2 - out * a2;
+            data[i] = out;
+        }
     }
 
     void setPeaking(float freq, float sampleRate, float Q, float gainDb) {

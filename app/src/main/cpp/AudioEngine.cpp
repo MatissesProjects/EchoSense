@@ -2,6 +2,7 @@
 #include <android/log.h>
 #include <cmath>
 #include <algorithm>
+#include <arm_neon.h>
 
 #define TAG "AudioEngine"
 
@@ -127,30 +128,12 @@ void AudioEngine::setProfile(AudioProfile profile) {
     mParamsChanged.store(true);
 }
 
-void AudioEngine::setSensorFusion(bool enabled) {
-    mSensorFusionEnabled.store(enabled);
-}
-
-void AudioEngine::setTargetLock(bool enabled) {
-    mTargetLockEnabled.store(enabled);
-    mParamsChanged.store(true);
-}
-
-void AudioEngine::setTargetSpeaker(int speakerId) {
-    mTargetSpeakerId.store(speakerId);
-}
-
-void AudioEngine::setMbCompression(float ratio) {
-    mMbCompressionRatio.store(ratio);
-}
-
-void AudioEngine::setBeamforming(bool enabled) {
-    mBeamformingEnabled.store(enabled);
-}
-
-void AudioEngine::setTransientSuppression(float strength) {
-    mTransientSuppressionStrength.store(strength);
-}
+void AudioEngine::setSensorFusion(bool enabled) { mSensorFusionEnabled.store(enabled); }
+void AudioEngine::setTargetLock(bool enabled) { mTargetLockEnabled.store(enabled); mParamsChanged.store(true); }
+void AudioEngine::setTargetSpeaker(int speakerId) { mTargetSpeakerId.store(speakerId); }
+void AudioEngine::setMbCompression(float ratio) { mMbCompressionRatio.store(ratio); }
+void AudioEngine::setBeamforming(bool enabled) { mBeamformingEnabled.store(enabled); }
+void AudioEngine::setTransientSuppression(float strength) { mTransientSuppressionStrength.store(strength); }
 
 void AudioEngine::learnNoise() {
     for (int i = 0; i < FFT_SIZE; i++) mNoiseProfile[i] = 0.0f;
@@ -199,64 +182,129 @@ void AudioEngine::updateFilters() {
     mParamsChanged.store(false);
 }
 
-inline float AudioEngine::processSample(float sample) {
-    if (mCurrentRampGain < 1.0f) mCurrentRampGain += mRampStep;
-    float out = sample * mPreAmpGain.load();
+oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
+    float *outputBuffer = static_cast<float *>(audioData);
+    if (mParamsChanged.load()) updateFilters();
 
-    // --- Speaker Isolation Placeholder ---
+    float phoneRMS = 0.0f;
+    float watchRMS = 0.0f;
+    
+    bool fusion = mSensorFusionEnabled.load();
+    InputSource source = mInputSource.load();
+
+    // 1. Acquire Input Data (Resampled or Direct)
+    if (source == InputSource::Watch || fusion) {
+        float sumSq = 0;
+        float remoteGain = mRemoteGain.load();
+        for (int i = 0; i < numFrames; ++i) {
+            float s = getNextResampledRemoteSample() * remoteGain;
+            sumSq += s * s;
+            if (source == InputSource::Watch) outputBuffer[i] = s;
+        }
+        watchRMS = sqrtf(sumSq / (float)numFrames);
+        mWatchEnergy.store(watchRMS);
+    }
+
+    if (source != InputSource::Watch) {
+        if (mRecordingStream) {
+            auto result = mRecordingStream->read(outputBuffer, numFrames, 0);
+            if (!result || result.value() < numFrames) {
+                int32_t start = result ? result.value() : 0;
+                for (int i = start; i < numFrames; i++) outputBuffer[i] = 0.0f;
+            }
+            
+            float sumSq = 0;
+            for (int i = 0; i < numFrames; i++) sumSq += outputBuffer[i] * outputBuffer[i];
+            phoneRMS = sqrtf(sumSq / (float)numFrames);
+            mPhoneEnergy.store(phoneRMS);
+        } else {
+            for (int i = 0; i < numFrames; i++) outputBuffer[i] = 0.0f;
+            mPhoneEnergy.store(0.0f);
+        }
+    }
+
+    // --- AI Beamforming (Software Array) ---
+    if (mBeamformingEnabled.load() && fusion && source != InputSource::Watch) {
+        float remoteGain = mRemoteGain.load() * 0.5f; 
+        mRemoteReadPos = (mRemoteReadPos - numFrames + REMOTE_BUFFER_SIZE) % REMOTE_BUFFER_SIZE;
+        
+        int i = 0;
+        float32x4_t vGain = vdupq_n_f32(remoteGain);
+        for (; i <= numFrames - 4; i += 4) {
+            float32x4_t vPhone = vld1q_f32(outputBuffer + i);
+            float noiseSamples[4];
+            for(int j=0; j<4; j++) noiseSamples[j] = mRemoteBuffer[(mRemoteReadPos + i + j) % REMOTE_BUFFER_SIZE];
+            float32x4_t vNoise = vld1q_f32(noiseSamples);
+            float32x4_t vResult = vsubq_f32(vPhone, vmulq_f32(vNoise, vGain));
+            vst1q_f32(outputBuffer + i, vResult);
+        }
+        for (; i < numFrames; i++) {
+            float noiseRef = mRemoteBuffer[(mRemoteReadPos + i) % REMOTE_BUFFER_SIZE] * remoteGain;
+            outputBuffer[i] -= noiseRef;
+        }
+        mRemoteReadPos = (mRemoteReadPos + numFrames) % REMOTE_BUFFER_SIZE;
+    }
+
+    // 2. Pre-Processing Gain Fusion (PreAmp * Master)
+    float combinedGain = mPreAmpGain.load() * mMasterGain.load();
+    
+    // --- Speaker Isolation ---
     int targetId = mTargetSpeakerId.load();
     if (targetId != -1) {
-        // If we are targeting Speaker A (Watch=0) or B (Phone=1), boost if they are dominant.
-        // DominantMic: 0 = Phone, 1 = Watch
         int dominant = getDominantMic();
-        // UI IDs might be 0 for A (Watch), 1 for B (Phone)
-        // Adjust logic: if targetId matches dominant, boost.
-        // Assuming Speaker A is Watch (1) and Speaker B is Phone (0) for now.
         int mappedTarget = (targetId == 0) ? 1 : 0; 
-        if (dominant == mappedTarget) {
-            out *= 2.0f; // 6dB extra boost for target speaker
-        } else {
-            out *= 0.5f; // 6dB reduction for non-target speaker
+        if (dominant == mappedTarget) combinedGain *= 2.0f;
+        else combinedGain *= 0.5f;
+    }
+
+    if (mCurrentRampGain < 1.0f) {
+        combinedGain *= mCurrentRampGain;
+        mCurrentRampGain += mRampStep * numFrames;
+    }
+
+    int i = 0;
+    float32x4_t vCombinedGain = vdupq_n_f32(combinedGain);
+    for (; i <= numFrames - 4; i += 4) {
+        float32x4_t vIn = vld1q_f32(outputBuffer + i);
+        vst1q_f32(outputBuffer + i, vmulq_f32(vIn, vCombinedGain));
+    }
+    for (; i < numFrames; i++) outputBuffer[i] *= combinedGain;
+
+    // 3. AI Spectral Processing (Block-based)
+    float reduction = mSpectralReductionStrength.load();
+    float specGate = mSpectralGateThreshold.load();
+    if (reduction > 0.01f || specGate > 0.001f) {
+        for (int i = 0; i < numFrames; i += FFT_SIZE) {
+            if (i + FFT_SIZE <= numFrames) {
+                mSpectralProcessor->processBlock(outputBuffer + i, mNoiseProfile, reduction, specGate);
+            }
         }
     }
 
-    float absOut = std::abs(out);
-    if (absOut > mNoiseGateThreshold.load()) {
-        mGateHoldCounter = mGateHoldFrames;
-    } else if (mGateHoldCounter > 0) {
-        mGateHoldCounter--;
-    }
-    if (mGateHoldCounter <= 0) return 0.0f;
+    // 4. Biquad Cascade (Block-based for Cache Efficiency)
+    mHighPass.processBlock(outputBuffer, numFrames);
+    mLowPass.processBlock(outputBuffer, numFrames);
+    mVoiceFilters[0].processBlock(outputBuffer, numFrames);
+    mVoiceFilters[1].processBlock(outputBuffer, numFrames);
+    for (int b = 0; b < 5; b++) mEQBands[b].processBlock(outputBuffer, numFrames);
 
-    out = mHighPass.process(out);
-    out = mLowPass.process(out);
-    out = mVoiceFilters[0].process(out);
-    out = mVoiceFilters[1].process(out);
-    for (int i = 0; i < 5; ++i) out = mEQBands[i].process(out);
-    
-    out *= mMasterGain.load() * mCurrentRampGain;
-
-    // --- Transient Suppressor (Keyboard Click Killer) ---
-    float suppressionStrength = mTransientSuppressionStrength.load();
-    if (suppressionStrength > 0.01f) {
-        float absOut = std::abs(out);
-        float attack = 0.5f;
-        float release = 0.001f;
-        if (absOut > mEnergyEnvelope) mEnergyEnvelope = mEnergyEnvelope * (1.0f - attack) + absOut * attack;
-        else mEnergyEnvelope = mEnergyEnvelope * (1.0f - release) + absOut * release;
-
-        if (absOut > mEnergyEnvelope * (2.0f / suppressionStrength) && absOut > 0.02f) {
-            mSuppressionGain = 0.0f; 
-        }
-        if (mSuppressionGain < 1.0f) mSuppressionGain += 0.05f;
-        out *= mSuppressionGain;
-    }
-
+    // 5. Dynamics & Protection (Final Pass)
     float limit = mLimiterThreshold.load();
-    if (out > limit) out = limit + (out - limit) * 0.1f;
-    else if (out < -limit) out = -limit + (out + limit) * 0.1f;
+    float32x4_t vLimit = vdupq_n_f32(limit);
+    float32x4_t vNegLimit = vdupq_n_f32(-limit);
+    
+    i = 0;
+    for (; i <= numFrames - 4; i += 4) {
+        float32x4_t vOut = vld1q_f32(outputBuffer + i);
+        vOut = vmaxq_f32(vNegLimit, vminq_f32(vLimit, vOut));
+        vst1q_f32(outputBuffer + i, vOut);
+    }
+    for (; i < numFrames; i++) {
+        outputBuffer[i] = std::clamp(outputBuffer[i], -limit, limit);
+    }
 
-    return std::clamp(out, -1.0f, 1.0f);
+    updateVisualization(outputBuffer, numFrames);
+    return oboe::DataCallbackResult::Continue;
 }
 
 void AudioEngine::updateVisualization(const float* data, int numFrames) {
@@ -295,169 +343,18 @@ void AudioEngine::autoTune() {
 }
 
 int AudioEngine::getDominantMic() const {
-    // Return 1 if watch is significantly louder than phone, else 0
     return (mWatchEnergy.load() > mPhoneEnergy.load() * 1.2f) ? 1 : 0;
 }
 
 void AudioEngine::getSpeakerInfo(SpeakerInfo* outSpeakers, int maxSpeakers) {
     if (maxSpeakers < 2) return;
-    
-    // Speaker A (Watch)
     outSpeakers[0].id = 0;
     outSpeakers[0].energyWatch = mWatchEnergy.load();
-    outSpeakers[0].energyPhone = mPhoneEnergy.load() * 0.2f; // Assuming some bleed
+    outSpeakers[0].energyPhone = mPhoneEnergy.load() * 0.2f;
     outSpeakers[0].isActive = outSpeakers[0].energyWatch > 0.01f;
 
-    // Speaker B (Phone)
     outSpeakers[1].id = 1;
     outSpeakers[1].energyPhone = mPhoneEnergy.load();
-    outSpeakers[1].energyWatch = mWatchEnergy.load() * 0.2f; // Assuming some bleed
+    outSpeakers[1].energyWatch = mWatchEnergy.load() * 0.2f;
     outSpeakers[1].isActive = outSpeakers[1].energyPhone > 0.01f;
-}
-
-oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
-    float *outputBuffer = static_cast<float *>(audioData);
-    if (mParamsChanged.load()) updateFilters();
-
-    float ambientRMS = 0.0f;
-    float phoneRMS = 0.0f;
-    float watchRMS = 0.0f;
-    
-    bool fusion = mSensorFusionEnabled.load();
-    InputSource source = mInputSource.load();
-
-    if (source == InputSource::Watch || fusion) {
-        float sumSq = 0;
-        float remoteGain = mRemoteGain.load();
-        for (int i = 0; i < numFrames; ++i) {
-            float s = getNextResampledRemoteSample() * remoteGain;
-            sumSq += s * s;
-            if (source == InputSource::Watch) outputBuffer[i] = s;
-        }
-        watchRMS = sqrtf(sumSq / (float)numFrames);
-        mWatchEnergy.store(watchRMS);
-        ambientRMS = watchRMS;
-    }
-
-    if (source != InputSource::Watch) {
-        if (mRecordingStream) {
-            auto result = mRecordingStream->read(outputBuffer, numFrames, 0);
-            if (!result || result.value() < numFrames) {
-                int32_t start = result ? result.value() : 0;
-                for (int i = start; i < numFrames; i++) outputBuffer[i] = 0.0f;
-            }
-            
-            float sumSq = 0;
-            for (int i = 0; i < numFrames; i++) sumSq += outputBuffer[i] * outputBuffer[i];
-            phoneRMS = sqrtf(sumSq / (float)numFrames);
-            mPhoneEnergy.store(phoneRMS);
-        } else {
-            for (int i = 0; i < numFrames; i++) outputBuffer[i] = 0.0f;
-            mPhoneEnergy.store(0.0f);
-        }
-    }
-
-    // --- AI Beamforming (Software Array) ---
-    if (mBeamformingEnabled.load() && fusion && source != InputSource::Watch) {
-        // Simple Phase-Cancellation Beamforming:
-        // Use the watch mic as a 'noise reference' (180 deg out of phase) 
-        // to subtract common ambient noise from the phone mic.
-        float remoteGain = mRemoteGain.load() * 0.5f; // Calibrate for cancellation
-        mRemoteReadPos = (mRemoteReadPos - numFrames + REMOTE_BUFFER_SIZE) % REMOTE_BUFFER_SIZE; // Peek back
-        for (int i = 0; i < numFrames; i++) {
-            float noiseRef = mRemoteBuffer[(mRemoteReadPos + i) % REMOTE_BUFFER_SIZE] * remoteGain;
-            outputBuffer[i] = outputBuffer[i] - noiseRef;
-        }
-        // Advance read pos properly
-        mRemoteReadPos = (mRemoteReadPos + numFrames) % REMOTE_BUFFER_SIZE;
-    }
-
-    // AI Spectral Processing
-    float reduction = mSpectralReductionStrength.load();
-    float specGate = mSpectralGateThreshold.load();
-    
-    float energyBefore = 0.0f;
-    if (reduction > 0.01f || specGate > 0.001f) {
-        for (int i = 0; i < numFrames; i++) energyBefore += outputBuffer[i] * outputBuffer[i];
-    }
-
-    if (mLearningNoise.load()) {
-        for (int i = 0; i < numFrames; i += FFT_SIZE) {
-            if (i + FFT_SIZE <= numFrames) {
-                std::vector<std::complex<float>> block(FFT_SIZE);
-                for(int j=0; j<FFT_SIZE; j++) block[j] = std::complex<float>(outputBuffer[i+j], 0.0f);
-                mSpectralProcessor->fft(block, false);
-                for(int j=0; j<FFT_SIZE; j++) {
-                    mNoiseProfile[j] = (mNoiseProfile[j] * mLearningCounter + std::abs(block[j])) / (mLearningCounter + 1);
-                }
-                mLearningCounter++;
-            }
-        }
-        if (mLearningCounter > 200) {
-            mLearningNoise.store(false);
-            __android_log_print(ANDROID_LOG_INFO, TAG, "Spectral Noise Learning Complete");
-        }
-    } else if (reduction > 0.01f || specGate > 0.001f) {
-        for (int i = 0; i < numFrames; i += FFT_SIZE) {
-            if (i + FFT_SIZE <= numFrames) {
-                mSpectralProcessor->processBlock(outputBuffer + i, mNoiseProfile, reduction, specGate);
-            }
-        }
-    }
-
-    float baseThreshold = mNoiseGateThreshold.load();
-    if (fusion) {
-        float dynamicThresh = baseThreshold + (ambientRMS * 0.5f);
-        mNoiseGateThreshold.store(dynamicThresh);
-    }
-
-    // --- Multi-band AI Dynamics ---
-    float mbRatio = mMbCompressionRatio.load();
-    if (mbRatio > 1.01f) {
-        // Simple 3-band split logic (not a perfect crossover, but efficient)
-        float lowEnergy = 0, midEnergy = 0, highEnergy = 0;
-        for (int i = 0; i < numFrames; i++) {
-            float absS = std::abs(outputBuffer[i]);
-            if (i < numFrames / 3) lowEnergy += absS;
-            else if (i < 2 * numFrames / 3) midEnergy += absS;
-            else highEnergy += absS;
-        }
-        lowEnergy /= (numFrames/3.0f); midEnergy /= (numFrames/3.0f); highEnergy /= (numFrames/3.0f);
-
-        // Compress bands that exceed threshold (-24dB approx)
-        float thresh = 0.06f; 
-        float lowGain = (lowEnergy > thresh) ? 1.0f / (1.0f + (lowEnergy - thresh) * mbRatio) : 1.0f;
-        float midGain = (midEnergy > thresh) ? 1.0f / (1.0f + (midEnergy - thresh) * (mbRatio * 0.5f)) : 1.0f; // Mid less compressed for speech
-        float highGain = (highEnergy > thresh) ? 1.0f / (1.0f + (highEnergy - thresh) * mbRatio) : 1.0f;
-
-        for (int i = 0; i < numFrames; i++) {
-            if (i < numFrames / 3) outputBuffer[i] *= lowGain;
-            else if (i < 2 * numFrames / 3) outputBuffer[i] *= midGain;
-            else outputBuffer[i] *= highGain;
-        }
-    }
-
-    for (int i = 0; i < numFrames; ++i) {
-        outputBuffer[i] = processSample(outputBuffer[i]);
-    }
-
-    if (fusion) mNoiseGateThreshold.store(baseThreshold);
-
-    // Calculate Isolation Gain (reduction achieved by AI)
-    if (reduction > 0.01f || specGate > 0.001f) {
-        float energyAfter = 0.0f;
-        for (int i = 0; i < numFrames; i++) energyAfter += outputBuffer[i] * outputBuffer[i];
-        
-        float gain = 0.0f;
-        if (energyBefore > 1e-9f) {
-            gain = 10.0f * log10f(energyBefore / (energyAfter + 1e-9f));
-        }
-        // Smooth the display value
-        mIsolationGainDb.store(mIsolationGainDb.load() * 0.9f + std::max(0.0f, gain) * 0.1f);
-    } else {
-        mIsolationGainDb.store(0.0f);
-    }
-
-    updateVisualization(outputBuffer, numFrames);
-    return oboe::DataCallbackResult::Continue;
 }
