@@ -9,12 +9,15 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.google.android.gms.wearable.ChannelClient
 import com.google.android.gms.wearable.ChannelClient.Channel
+import com.google.android.gms.wearable.MessageClient
+import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import com.echosense.app.utils.AudioConverter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class EchoSenseService : Service() {
@@ -23,9 +26,24 @@ class EchoSenseService : Service() {
     private val CHANNEL_ID = "EchoSenseServiceChannel"
     private val NOTIFICATION_ID = 1
     private val WEAR_AUDIO_CHANNEL = "/audio_stream_channel"
+    private val SPEAKER_INFO_PATH = "/speaker_info"
+    private val SET_TARGET_SPEAKER_PATH = "/set_target_speaker"
 
     private lateinit var channelClient: ChannelClient
+    private lateinit var messageClient: MessageClient
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    private val messageListener = MessageClient.OnMessageReceivedListener { messageEvent ->
+        if (messageEvent.path == SET_TARGET_SPEAKER_PATH) {
+            val speakerId = String(messageEvent.data).toIntOrNull() ?: -1
+            AudioEngineLib.setTargetSpeaker(speakerId)
+            Log.d(TAG, "Target speaker set from Wear: $speakerId")
+            
+            // Update settings too so UI reflects it
+            val settings = AudioSettingsManager(this)
+            settings.saveInt(AudioSettingsManager.KEY_TARGET_SPEAKER, speakerId)
+        }
+    }
 
     private val channelCallback = object : ChannelClient.ChannelCallback() {
         override fun onChannelOpened(channel: Channel) {
@@ -44,7 +62,36 @@ class EchoSenseService : Service() {
         createNotificationChannel()
         channelClient = Wearable.getChannelClient(this)
         channelClient.registerChannelCallback(channelCallback)
-        Log.d(TAG, "Service Created, ChannelCallback registered")
+        
+        messageClient = Wearable.getMessageClient(this)
+        messageClient.addListener(messageListener)
+        
+        startSpeakerInfoBroadcaster()
+        Log.d(TAG, "Service Created, ChannelCallback & MessageListener registered")
+    }
+
+    private fun startSpeakerInfoBroadcaster() {
+        serviceScope.launch {
+            while (true) {
+                try {
+                    if (AudioEngineLib.isAudioEngineRunning()) {
+                        val speakers = AudioEngineLib.getSpeakerInfo()
+                        // Format: "id:name:isActive|id:name:isActive"
+                        val data = speakers.joinToString("|") { 
+                            "${it.id}:${if(it.id == 0) "Speaker A" else "Speaker B"}:${it.isActive}"
+                        }
+                        
+                        val nodes = Wearable.getNodeClient(this@EchoSenseService).connectedNodes.await()
+                        for (node in nodes) {
+                            messageClient.sendMessage(node.id, SPEAKER_INFO_PATH, data.toByteArray()).await()
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error in speaker info broadcaster", e)
+                }
+                delay(2000) // Polling every 2 seconds for efficiency
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -69,6 +116,7 @@ class EchoSenseService : Service() {
     override fun onDestroy() {
         Log.d(TAG, "Service being destroyed")
         channelClient.unregisterChannelCallback(channelCallback)
+        messageClient.removeListener(messageListener)
         serviceScope.cancel()
         AudioEngineLib.stopAudioEngine()
         super.onDestroy()
