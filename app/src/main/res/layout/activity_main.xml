@@ -157,7 +157,20 @@
             android:max="100"
             android:progress="0"
             android:layout_marginBottom="16dp" />
-        <!-- Profiles Section -->
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="AI Harmonic-Percussive Separator (Speech Focus)"
+            android:textColor="#BBBBBB"
+            android:textSize="12sp" />
+        <SeekBar
+            android:id="@+id/seekBarHpss"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="0"
+            android:layout_marginBottom="16dp" />        <!-- Profiles Section -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

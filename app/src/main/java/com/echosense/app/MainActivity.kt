@@ -102,6 +102,7 @@ class MainActivity : AppCompatActivity() {
         binding.seekBarSpectralReduction.progress = (settingsManager.getFloat("spectral_reduction", 0.0f) * 100).toInt()
         binding.seekBarSpectralGate.progress = (settingsManager.getFloat("spectral_gate_thresh", 0.0f) * 5000).toInt()
         binding.seekBarDereverb.progress = AudioParameterMapper.dereverbToProgress(settingsManager.getFloat("dereverb_strength", 0.0f))
+        binding.seekBarHpss.progress = AudioParameterMapper.hpssToProgress(settingsManager.getFloat("hpss_strength", 0.0f))
         binding.seekBarNoiseGate.progress = AudioParameterMapper.noiseGateThresholdToProgress(settingsManager.getFloat(AudioSettingsManager.KEY_NOISE_GATE, 0.0f))
         binding.seekBarWatchGain.progress = AudioParameterMapper.watchGainToProgress(settingsManager.getFloat(AudioSettingsManager.KEY_WATCH_GAIN, 2.0f))
         
@@ -417,6 +418,16 @@ class MainActivity : AppCompatActivity() {
                 val strength = AudioParameterMapper.progressToDereverb(p)
                 AudioEngineLib.setDereverbStrength(strength) 
                 settingsManager.saveFloat("dereverb_strength", strength)
+            }
+            override fun onStartTrackingTouch(s: SeekBar?) {}
+            override fun onStopTrackingTouch(s: SeekBar?) {}
+        })
+
+        binding.seekBarHpss.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
+                val strength = AudioParameterMapper.progressToHpss(p)
+                AudioEngineLib.setHpssStrength(strength) 
+                settingsManager.saveFloat("hpss_strength", strength)
             }
             override fun onStartTrackingTouch(s: SeekBar?) {}
             override fun onStopTrackingTouch(s: SeekBar?) {}

@@ -94,6 +94,7 @@ void AudioEngine::setNoiseGateThreshold(float threshold) { mNoiseGateThreshold.s
 void AudioEngine::setSpectralReduction(float strength) { mSpectralReductionStrength.store(strength); }
 void AudioEngine::setSpectralGateThreshold(float threshold) { mSpectralGateThreshold.store(threshold); }
 void AudioEngine::setDereverbStrength(float strength) { mDereverbStrength.store(strength); }
+void AudioEngine::setHpssStrength(float strength) { mHpssStrength.store(strength); }
 void AudioEngine::setMasterGain(float gain) { mMasterGain.store(gain); }
 
 void AudioEngine::setEqualizerBandGain(int bandIndex, float gainDb) {
@@ -232,16 +233,12 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
         float remoteGain = mRemoteGain.load(); 
         mRemoteReadPos = (mRemoteReadPos - numFrames + REMOTE_BUFFER_SIZE) % REMOTE_BUFFER_SIZE;
         
-        // Prepare temporary reference buffer with gain applied
         float noiseRef[numFrames];
         for (int i = 0; i < numFrames; i++) {
             noiseRef[i] = mRemoteBuffer[(mRemoteReadPos + i) % REMOTE_BUFFER_SIZE] * remoteGain;
         }
         
-        // Use Adaptive LMS to cancel noise from outputBuffer (phone) 
-        // using noiseRef (watch) as the reference.
         mLmsFilter.processBlock(outputBuffer, noiseRef, numFrames);
-
         mRemoteReadPos = (mRemoteReadPos + numFrames) % REMOTE_BUFFER_SIZE;
     }
 
@@ -275,10 +272,11 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
     float reduction = mSpectralReductionStrength.load();
     float specGate = mSpectralGateThreshold.load();
     float dereverb = mDereverbStrength.load();
-    if (reduction > 0.01f || specGate > 0.001f || dereverb > 0.01f) {
+    float hpss = mHpssStrength.load();
+    if (reduction > 0.01f || specGate > 0.001f || dereverb > 0.01f || hpss > 0.01f) {
         for (int j = 0; j < numFrames; j += FFT_SIZE) {
             if (j + FFT_SIZE <= numFrames) {
-                mSpectralProcessor->processBlock(outputBuffer + j, mNoiseProfile, reduction, specGate, dereverb);
+                mSpectralProcessor->processBlock(outputBuffer + j, mNoiseProfile, reduction, specGate, dereverb, hpss);
             }
         }
     }
