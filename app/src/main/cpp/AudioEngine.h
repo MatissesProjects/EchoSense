@@ -132,6 +132,7 @@ public:
     void setDereverbStrength(float strength);
     void setHpssStrength(float strength);
     void setFreqWarpStrength(float strength);
+    void setNeuralMaskStrength(float strength);
     void setEqualizerBandGain(int bandIndex, float gainDb);
     void setMasterGain(float gain);
     void setProfile(AudioProfile profile);
@@ -194,6 +195,7 @@ private:
     std::atomic<float> mDereverbStrength{0.0f};
     std::atomic<float> mHpssStrength{0.0f};
     std::atomic<float> mFreqWarpStrength{0.0f};
+    std::atomic<float> mNeuralMaskStrength{0.0f};
     std::atomic<float> mManualBandGains[5];
     std::atomic<float> mProfileBandGains[5];
     std::atomic<float> mMasterGain{1.0f};

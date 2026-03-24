@@ -13,6 +13,10 @@ public:
         mPrevMag.assign(mSize, 0.0f);
         mBitRev.resize(mSize);
         
+        // Pseudo-Neural State (Fast/Slow Energy Estimators)
+        mFastEnergy.assign(mSize, 0.0f);
+        mSlowEnergy.assign(mSize, 0.0f);
+
         mHistorySize = 5; 
         mMagHistory.resize(mHistorySize, std::vector<float>(mSize, 0.0f));
         mHistoryIndex = 0;
@@ -36,7 +40,7 @@ public:
 
     void processBlock(float* data, float* noiseProfile, float reductionStrength, 
                      float spectralGateThresh, float dereverbStrength, float hpssStrength,
-                     float freqWarpStrength) {
+                     float freqWarpStrength, float neuralMaskStrength) {
         for (int i = 0; i < mSize; i++) {
             mReal[i] = data[i];
             mImag[i] = 0.0f;
@@ -56,11 +60,29 @@ public:
 
         std::vector<float> newMag = currentMag;
 
+        // Neural-like Masking Params
+        float alphaFast = 0.4f;
+        float alphaSlow = 0.05f;
+
         for (int i = 0; i < mSize; i++) {
             float magnitude = currentMag[i];
             if (magnitude < 1e-9f) {
                 mPrevMag[i] *= decay;
+                mFastEnergy[i] *= (1.0f - alphaFast);
+                mSlowEnergy[i] *= (1.0f - alphaSlow);
                 continue;
+            }
+
+            // --- Multi-Band Neural Masking (Recursive Energy Ratio) ---
+            if (neuralMaskStrength > 0.01f) {
+                mFastEnergy[i] = (1.0f - alphaFast) * mFastEnergy[i] + alphaFast * magnitude;
+                mSlowEnergy[i] = (1.0f - alphaSlow) * mSlowEnergy[i] + alphaSlow * magnitude;
+                
+                // Ratio of fast energy to slow energy (high ratio = likely speech transient)
+                float snr_estimate = mFastEnergy[i] / (mSlowEnergy[i] + 1e-6f);
+                // Sigmoid-like gain mask based on SNR estimate
+                float mask = 1.0f / (1.0f + expf(-2.0f * (snr_estimate - 1.5f)));
+                newMag[i] *= (1.0f - neuralMaskStrength) + (mask * neuralMaskStrength);
             }
 
             // --- HPSS ---
@@ -109,21 +131,15 @@ public:
         if (freqWarpStrength > 0.01f) {
             std::vector<float> warpedMag = newMag;
             for (int i = 0; i < mSize / 2; i++) {
-                // Non-linear mapping: pull high bins into lower bins
-                // warping: 0.0 = linear, 1.0 = heavy compression
                 float normalizedFreq = (float)i / (mSize / 2.0f);
-                // Warp function: f_new = f_old ^ (1.0 + strength)
                 float warpedFreq = powf(normalizedFreq, 1.0f + freqWarpStrength * 0.5f);
                 int sourceBin = (int)(warpedFreq * (mSize / 2.0f));
                 sourceBin = std::min(mSize / 2 - 1, sourceBin);
-                
-                // Blend original and warped
                 warpedMag[i] = newMag[i] * (1.0f - freqWarpStrength) + newMag[sourceBin] * freqWarpStrength;
             }
             newMag = warpedMag;
         }
 
-        // Reconstruct
         for (int i = 0; i < mSize; i++) {
             mReal[i] = newMag[i] * cosf(currentPhase[i]);
             mImag[i] = newMag[i] * sinf(currentPhase[i]);
@@ -173,6 +189,8 @@ private:
     std::vector<float> mReal;
     std::vector<float> mImag;
     std::vector<float> mPrevMag;
+    std::vector<float> mFastEnergy;
+    std::vector<float> mSlowEnergy;
     int mHistorySize;
     std::vector<std::vector<float>> mMagHistory;
     int mHistoryIndex;
