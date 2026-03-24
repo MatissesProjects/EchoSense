@@ -128,6 +128,14 @@ public:
     void setTransientSuppression(float strength);
     void learnNoise();
     float getVolumeLevel() const { return mCurrentVolume.load(); }
+    struct SpeakerInfo {
+        int id;
+        float energyPhone;
+        float energyWatch;
+        bool isActive;
+    };
+
+    void getSpeakerInfo(SpeakerInfo* outSpeakers, int maxSpeakers);
     int getDominantMic() const; // Returns 0 for Phone, 1 for Watch
 
     void getFftData(float* output, int size);

@@ -139,6 +139,37 @@ JNIEXPORT void JNICALL JNI_METHOD(getFftData)(JNIEnv *env, jobject, jfloatArray 
     }
 }
 
+JNIEXPORT jint JNICALL JNI_METHOD(getSpeakerInfo)(JNIEnv *env, jobject, jintArray ids, jfloatArray energyPhone, jfloatArray energyWatch, jbooleanArray active) {
+    if (audioEngine == nullptr) return 0;
+    
+    jsize maxSpeakers = env->GetArrayLength(ids);
+    auto* speakerInfos = new AudioEngine::SpeakerInfo[maxSpeakers];
+    
+    audioEngine->getSpeakerInfo(speakerInfos, maxSpeakers);
+    
+    jint count = 2; // For now fixed 2
+    
+    jint* c_ids = env->GetIntArrayElements(ids, NULL);
+    jfloat* c_phone = env->GetFloatArrayElements(energyPhone, NULL);
+    jfloat* c_watch = env->GetFloatArrayElements(energyWatch, NULL);
+    jboolean* c_active = env->GetBooleanArrayElements(active, NULL);
+    
+    for (int i = 0; i < count; i++) {
+        c_ids[i] = speakerInfos[i].id;
+        c_phone[i] = speakerInfos[i].energyPhone;
+        c_watch[i] = speakerInfos[i].energyWatch;
+        c_active[i] = speakerInfos[i].isActive;
+    }
+    
+    env->ReleaseIntArrayElements(ids, c_ids, 0);
+    env->ReleaseFloatArrayElements(energyPhone, c_phone, 0);
+    env->ReleaseFloatArrayElements(energyWatch, c_watch, 0);
+    env->ReleaseBooleanArrayElements(active, c_active, 0);
+    
+    delete[] speakerInfos;
+    return count;
+}
+
 JNIEXPORT void JNICALL JNI_METHOD(getEqCurveData)(JNIEnv *env, jobject, jfloatArray output) {
     if (audioEngine != nullptr) {
         jfloat *c_output = env->GetFloatArrayElements(output, NULL);

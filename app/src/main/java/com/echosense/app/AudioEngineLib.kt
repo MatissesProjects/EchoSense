@@ -41,6 +41,28 @@ object AudioEngineLib {
     external fun autoTune()
     external fun learnNoise()
 
+    data class SpeakerInfo(
+        val id: Int,
+        val energyPhone: Float,
+        val energyWatch: Float,
+        val isActive: Boolean
+    )
+
+    fun getSpeakerInfo(maxSpeakers: Int = 5): List<SpeakerInfo> {
+        val ids = IntArray(maxSpeakers)
+        val energyPhone = FloatArray(maxSpeakers)
+        val energyWatch = FloatArray(maxSpeakers)
+        val active = BooleanArray(maxSpeakers)
+        
+        val count = getSpeakerInfo(ids, energyPhone, energyWatch, active)
+        
+        return (0 until count).map { i ->
+            SpeakerInfo(ids[i], energyPhone[i], energyWatch[i], active[i])
+        }
+    }
+
+    private external fun getSpeakerInfo(ids: IntArray, energyPhone: FloatArray, energyWatch: FloatArray, active: BooleanArray): Int
+
     fun restoreSettings(context: Context) {
         val settings = AudioSettingsManager(context)
         setPreAmpGain(settings.getFloat(AudioSettingsManager.KEY_PRE_AMP, 1.0f))

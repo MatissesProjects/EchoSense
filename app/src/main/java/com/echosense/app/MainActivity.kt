@@ -200,21 +200,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        binding.chipGroupSpeaker.setOnCheckedStateChangeListener { _, checkedIds ->
-            val checkedId = if (checkedIds.isNotEmpty()) checkedIds[0] else View.NO_ID
-            val speakerId = when (checkedId) {
-                R.id.chipSpeakerA -> 0
-                R.id.chipSpeakerB -> 1
-                else -> -1
-            }
-            AudioEngineLib.setTargetSpeaker(speakerId)
-            settingsManager.saveInt(AudioSettingsManager.KEY_TARGET_SPEAKER, speakerId)
-            
-            if (speakerId != -1) {
-                Toast.makeText(this, "Isolating Speaker ${if(speakerId==0) "A" else "B"}", Toast.LENGTH_SHORT).show()
-            }
-        }
-
         binding.btnLearnNoise.setOnClickListener {
             AudioEngineLib.learnNoise()
             Toast.makeText(this, "Learning Environment Noise... (Keep Quiet)", Toast.LENGTH_LONG).show()
@@ -522,9 +507,59 @@ class MainActivity : AppCompatActivity() {
         speechRecognizer?.cancel()
     }
 
+    private fun refreshSpeakerList() {
+        val speakers = AudioEngineLib.getSpeakerInfo()
+        val currentTargetId = settingsManager.getInt(AudioSettingsManager.KEY_TARGET_SPEAKER, -1)
+        
+        // Only update if something changed or we need to initialize
+        if (binding.chipGroupSpeaker.childCount <= 1) { // Only "None" exists or empty
+            // Ensure "None" exists
+            if (binding.chipGroupSpeaker.findViewById<View>(R.id.chipSpeakerNone) == null) {
+                val noneChip = com.google.android.material.chip.Chip(this).apply {
+                    id = R.id.chipSpeakerNone
+                    text = "None"
+                    isCheckable = true
+                    isChecked = currentTargetId == -1
+                }
+                binding.chipGroupSpeaker.addView(noneChip)
+            }
+        }
+
+        speakers.forEach { speaker ->
+            val chipId = 100 + speaker.id
+            var chip = binding.chipGroupSpeaker.findViewById<com.google.android.material.chip.Chip>(chipId)
+            
+            if (chip == null) {
+                chip = com.google.android.material.chip.Chip(this).apply {
+                    id = chipId
+                    isCheckable = true
+                    text = if (speaker.id == 0) "Speaker A (Watch)" else "Speaker B (Phone)"
+                    isChecked = currentTargetId == speaker.id
+                    setOnCheckedChangeListener { _, isChecked ->
+                        if (isChecked) {
+                            AudioEngineLib.setTargetSpeaker(speaker.id)
+                            settingsManager.saveInt(AudioSettingsManager.KEY_TARGET_SPEAKER, speaker.id)
+                            Toast.makeText(this@MainActivity, "Isolating ${this.text}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+                binding.chipGroupSpeaker.addView(chip)
+            }
+            
+            // Visual feedback of activity
+            if (speaker.isActive) {
+                chip.chipIcon = ContextCompat.getDrawable(this, android.R.drawable.ic_btn_speak_now)
+                chip.isIconVisible = true
+            } else {
+                chip.isIconVisible = false
+            }
+        }
+    }
+
     private fun startVisualizer() {
         visualizerJob?.cancel()
         visualizerJob = lifecycleScope.launch {
+            var counter = 0
             while (true) {
                 if (AudioEngineLib.isAudioEngineRunning()) {
                     val volume = AudioEngineLib.getVolumeLevel()
@@ -534,6 +569,12 @@ class MainActivity : AppCompatActivity() {
                     AudioEngineLib.getFftData(fftData)
                     AudioEngineLib.getEqCurveData(eqCurveData)
                     binding.visualizerView.updateData(fftData, eqCurveData, isolation)
+                    
+                    // Refresh speakers every ~300ms
+                    if (counter % 10 == 0) {
+                        refreshSpeakerList()
+                    }
+                    counter++
                 }
                 delay(33)
             }

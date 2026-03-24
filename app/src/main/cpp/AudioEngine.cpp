@@ -299,6 +299,22 @@ int AudioEngine::getDominantMic() const {
     return (mWatchEnergy.load() > mPhoneEnergy.load() * 1.2f) ? 1 : 0;
 }
 
+void AudioEngine::getSpeakerInfo(SpeakerInfo* outSpeakers, int maxSpeakers) {
+    if (maxSpeakers < 2) return;
+    
+    // Speaker A (Watch)
+    outSpeakers[0].id = 0;
+    outSpeakers[0].energyWatch = mWatchEnergy.load();
+    outSpeakers[0].energyPhone = mPhoneEnergy.load() * 0.2f; // Assuming some bleed
+    outSpeakers[0].isActive = outSpeakers[0].energyWatch > 0.01f;
+
+    // Speaker B (Phone)
+    outSpeakers[1].id = 1;
+    outSpeakers[1].energyPhone = mPhoneEnergy.load();
+    outSpeakers[1].energyWatch = mWatchEnergy.load() * 0.2f; // Assuming some bleed
+    outSpeakers[1].isActive = outSpeakers[1].energyPhone > 0.01f;
+}
+
 oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
     float *outputBuffer = static_cast<float *>(audioData);
     if (mParamsChanged.load()) updateFilters();
