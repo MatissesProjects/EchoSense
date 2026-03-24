@@ -10,6 +10,7 @@ public:
     SpectralProcessor(int fftSize) : mSize(fftSize) {
         mReal.resize(mSize);
         mImag.resize(mSize);
+        mPrevMag.assign(mSize, 0.0f);
         mBitRev.resize(mSize);
         
         // Precompute bit-reversal table
@@ -31,7 +32,7 @@ public:
         }
     }
 
-    void processBlock(float* data, float* noiseProfile, float reductionStrength, float spectralGateThresh) {
+    void processBlock(float* data, float* noiseProfile, float reductionStrength, float spectralGateThresh, float dereverbStrength) {
         // 1. Prepare Buffer
         for (int i = 0; i < mSize; i++) {
             mReal[i] = data[i];
@@ -39,15 +40,19 @@ public:
         }
 
         // 2. FFT
-        runFft(mReal.data(), mImag.size() ? mImag.data() : nullptr, false);
+        runFft(mReal.data(), mImag.data(), false);
 
-        // 3. Optimized Spectral Processing (Avoid complex objects)
+        // 3. Optimized Spectral Processing
+        float decay = 0.85f; // T60 decay approximation
         for (int i = 0; i < mSize; i++) {
             float r = mReal[i];
             float im = mImag[i];
             float magnitude = sqrtf(r * r + im * im);
             
-            if (magnitude < 1e-9f) continue;
+            if (magnitude < 1e-9f) {
+                mPrevMag[i] *= decay;
+                continue;
+            }
 
             float newMag = magnitude;
             
@@ -56,12 +61,21 @@ public:
                 newMag *= 0.05f; 
             }
 
-            // --- Spectral Subtraction ---
+            // --- Spectral Subtraction (Noise) ---
             float noiseFloor = noiseProfile[i] * reductionStrength;
             if (newMag < noiseFloor) {
                 newMag *= 0.1f;
             } else {
                 newMag -= noiseFloor * 0.5f;
+            }
+
+            // --- Spectral De-Reverberation ---
+            if (dereverbStrength > 0.01f) {
+                float lateReverb = mPrevMag[i] * decay;
+                if (newMag < lateReverb * dereverbStrength) {
+                    newMag *= 0.2f; // Suppress echo
+                }
+                mPrevMag[i] = std::max(newMag, lateReverb);
             }
             
             newMag = std::max(0.0f, newMag);
@@ -123,6 +137,7 @@ private:
     int mSize;
     std::vector<float> mReal;
     std::vector<float> mImag;
+    std::vector<float> mPrevMag;
     std::vector<int> mBitRev;
     std::vector<float> mSinTable;
     std::vector<float> mCosTable;

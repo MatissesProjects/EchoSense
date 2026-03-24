@@ -129,6 +129,7 @@ public:
     void setNoiseGateThreshold(float threshold);
     void setSpectralReduction(float strength);
     void setSpectralGateThreshold(float threshold);
+    void setDereverbStrength(float strength);
     void setEqualizerBandGain(int bandIndex, float gainDb);
     void setMasterGain(float gain);
     void setProfile(AudioProfile profile);
@@ -188,6 +189,7 @@ private:
     std::atomic<float> mNoiseGateThreshold{0.0f};
     std::atomic<float> mSpectralReductionStrength{0.0f};
     std::atomic<float> mSpectralGateThreshold{0.0f};
+    std::atomic<float> mDereverbStrength{0.0f};
     std::atomic<float> mManualBandGains[5];
     std::atomic<float> mProfileBandGains[5];
     std::atomic<float> mMasterGain{1.0f};

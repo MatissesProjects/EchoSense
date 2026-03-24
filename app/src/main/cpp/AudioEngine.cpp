@@ -93,6 +93,7 @@ void AudioEngine::setLimiterThreshold(float threshold) { mLimiterThreshold.store
 void AudioEngine::setNoiseGateThreshold(float threshold) { mNoiseGateThreshold.store(threshold); }
 void AudioEngine::setSpectralReduction(float strength) { mSpectralReductionStrength.store(strength); }
 void AudioEngine::setSpectralGateThreshold(float threshold) { mSpectralGateThreshold.store(threshold); }
+void AudioEngine::setDereverbStrength(float strength) { mDereverbStrength.store(strength); }
 void AudioEngine::setMasterGain(float gain) { mMasterGain.store(gain); }
 
 void AudioEngine::setEqualizerBandGain(int bandIndex, float gainDb) {
@@ -270,13 +271,14 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
 #endif
     for (; i < numFrames; i++) outputBuffer[i] *= combinedGain;
 
-    // 3. AI Spectral Processing
+    // 3. AI Spectral Processing (Block-based)
     float reduction = mSpectralReductionStrength.load();
     float specGate = mSpectralGateThreshold.load();
-    if (reduction > 0.01f || specGate > 0.001f) {
+    float dereverb = mDereverbStrength.load();
+    if (reduction > 0.01f || specGate > 0.001f || dereverb > 0.01f) {
         for (int j = 0; j < numFrames; j += FFT_SIZE) {
             if (j + FFT_SIZE <= numFrames) {
-                mSpectralProcessor->processBlock(outputBuffer + j, mNoiseProfile, reduction, specGate);
+                mSpectralProcessor->processBlock(outputBuffer + j, mNoiseProfile, reduction, specGate, dereverb);
             }
         }
     }
