@@ -28,6 +28,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 
+import com.echosense.app.utils.AudioParameterMapper
+
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
@@ -90,17 +92,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun restoreUiFromSettings() {
-        binding.seekBarPreAmp.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_PRE_AMP, 1.0f) * 10).toInt()
-        binding.seekBarVoiceBoost.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_VOICE_BOOST, 0.0f) / 0.3f).toInt()
-        binding.seekBarMasterGain.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_MASTER_GAIN, 1.0f) * 10).toInt()
-        binding.seekBarHpf.progress = (settingsManager.getFloat("hpf_freq", 150.0f) / 5.0f).toInt()
-        binding.seekBarLpf.progress = ((settingsManager.getFloat("lpf_freq", 12000.0f) - 1000.0f) / 190.0f).toInt()
-        binding.seekBarLimiter.progress = (settingsManager.getFloat("limiter_thresh", 0.9f) * 100).toInt()
-        binding.seekBarTransient.progress = (settingsManager.getFloat("transient_suppression", 0.0f) * 100).toInt()
+        binding.seekBarPreAmp.progress = AudioParameterMapper.preAmpGainToProgress(settingsManager.getFloat(AudioSettingsManager.KEY_PRE_AMP, 1.0f))
+        binding.seekBarVoiceBoost.progress = AudioParameterMapper.voiceBoostToProgress(settingsManager.getFloat(AudioSettingsManager.KEY_VOICE_BOOST, 0.0f))
+        binding.seekBarMasterGain.progress = AudioParameterMapper.masterGainToProgress(settingsManager.getFloat(AudioSettingsManager.KEY_MASTER_GAIN, 1.0f))
+        binding.seekBarHpf.progress = AudioParameterMapper.hpfFreqToProgress(settingsManager.getFloat("hpf_freq", 150.0f))
+        binding.seekBarLpf.progress = AudioParameterMapper.lpfFreqToProgress(settingsManager.getFloat("lpf_freq", 12000.0f))
+        binding.seekBarLimiter.progress = AudioParameterMapper.limiterThresholdToProgress(settingsManager.getFloat("limiter_thresh", 0.9f))
+        binding.seekBarTransient.progress = AudioParameterMapper.transientSuppressionToProgress(settingsManager.getFloat("transient_suppression", 0.0f))
         binding.seekBarSpectralReduction.progress = (settingsManager.getFloat("spectral_reduction", 0.0f) * 100).toInt()
         binding.seekBarSpectralGate.progress = (settingsManager.getFloat("spectral_gate_thresh", 0.0f) * 5000).toInt()
-        binding.seekBarNoiseGate.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_NOISE_GATE, 0.0f) * 200).toInt()
-        binding.seekBarWatchGain.progress = (settingsManager.getFloat(AudioSettingsManager.KEY_WATCH_GAIN, 2.0f) * 20).toInt()
+        binding.seekBarNoiseGate.progress = AudioParameterMapper.noiseGateThresholdToProgress(settingsManager.getFloat(AudioSettingsManager.KEY_NOISE_GATE, 0.0f))
+        binding.seekBarWatchGain.progress = AudioParameterMapper.watchGainToProgress(settingsManager.getFloat(AudioSettingsManager.KEY_WATCH_GAIN, 2.0f))
         
         val profile = settingsManager.getInt(AudioSettingsManager.KEY_PROFILE, 3)
         when (profile) {
@@ -123,7 +125,7 @@ class MainActivity : AppCompatActivity() {
         binding.swSensorFusion.isChecked = settingsManager.prefs.getBoolean("sensor_fusion", false)
         binding.swTargetLock.isChecked = settingsManager.prefs.getBoolean("target_lock", false)
         binding.swBeamforming.isChecked = settingsManager.prefs.getBoolean("beamforming", false)
-        binding.seekBarMbRatio.progress = (settingsManager.getFloat("mb_compression", 1.0f) * 10 - 10).toInt()
+        binding.seekBarMbRatio.progress = AudioParameterMapper.mbCompressionRatioToProgress(settingsManager.getFloat("mb_compression", 1.0f))
 
         val speakerId = settingsManager.getInt(AudioSettingsManager.KEY_TARGET_SPEAKER, -1)
         when (speakerId) {
@@ -132,11 +134,11 @@ class MainActivity : AppCompatActivity() {
             else -> binding.chipGroupSpeaker.check(R.id.chipSpeakerNone)
         }
 
-        binding.seekBarBand1.progress = (settingsManager.getFloat("band_0", 0.0f) / 0.12f + 100).toInt()
-        binding.seekBarBand2.progress = (settingsManager.getFloat("band_1", 0.0f) / 0.12f + 100).toInt()
-        binding.seekBarBand3.progress = (settingsManager.getFloat("band_2", 0.0f) / 0.12f + 100).toInt()
-        binding.seekBarBand4.progress = (settingsManager.getFloat("band_3", 0.0f) / 0.12f + 100).toInt()
-        binding.seekBarBand5.progress = (settingsManager.getFloat("band_4", 0.0f) / 0.12f + 100).toInt()
+        binding.seekBarBand1.progress = AudioParameterMapper.eqBandGainToProgress(settingsManager.getFloat("band_0", 0.0f))
+        binding.seekBarBand2.progress = AudioParameterMapper.eqBandGainToProgress(settingsManager.getFloat("band_1", 0.0f))
+        binding.seekBarBand3.progress = AudioParameterMapper.eqBandGainToProgress(settingsManager.getFloat("band_2", 0.0f))
+        binding.seekBarBand4.progress = AudioParameterMapper.eqBandGainToProgress(settingsManager.getFloat("band_3", 0.0f))
+        binding.seekBarBand5.progress = AudioParameterMapper.eqBandGainToProgress(settingsManager.getFloat("band_4", 0.0f))
     }
 
     private fun setupUI() {
@@ -220,7 +222,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.seekBarSpectralReduction.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
-                val strength = p / 100.0f
+                val strength = p / 100.0f // Special case for spectral
                 AudioEngineLib.setSpectralReduction(strength) 
                 settingsManager.saveFloat("spectral_reduction", strength)
             }
@@ -230,7 +232,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.seekBarSpectralGate.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
-                val thresh = p / 5000.0f // Scale for sensitive per-band gate
+                val thresh = p / 5000.0f // Special case for spectral gate
                 AudioEngineLib.setSpectralGateThreshold(thresh) 
                 settingsManager.saveFloat("spectral_gate_thresh", thresh)
             }
@@ -276,7 +278,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.seekBarWatchGain.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
-                val gain = p / 20.0f
+                val gain = AudioParameterMapper.progressToWatchGain(p)
                 AudioEngineLib.setRemoteGain(gain) 
                 settingsManager.saveFloat(AudioSettingsManager.KEY_WATCH_GAIN, gain)
             }
@@ -316,7 +318,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.seekBarPreAmp.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
-                val gain = p / 10.0f
+                val gain = AudioParameterMapper.progressToPreAmpGain(p)
                 AudioEngineLib.setPreAmpGain(gain)
                 settingsManager.saveFloat(AudioSettingsManager.KEY_PRE_AMP, gain)
             }
@@ -326,7 +328,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.seekBarVoiceBoost.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
-                val gain = p * 0.3f
+                val gain = AudioParameterMapper.progressToVoiceBoost(p)
                 AudioEngineLib.setVoiceBoost(gain) 
                 settingsManager.saveFloat(AudioSettingsManager.KEY_VOICE_BOOST, gain)
             }
@@ -336,7 +338,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.seekBarMasterGain.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
-                val gain = p / 10.0f
+                val gain = AudioParameterMapper.progressToMasterGain(p)
                 AudioEngineLib.setMasterGain(gain) 
                 settingsManager.saveFloat(AudioSettingsManager.KEY_MASTER_GAIN, gain)
             }
@@ -346,7 +348,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.seekBarHpf.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
-                val freq = p * 5.0f + 50.0f // 50Hz to 550Hz
+                val freq = AudioParameterMapper.progressToHpfFreq(p)
                 AudioEngineLib.setHpfFreq(freq) 
                 settingsManager.saveFloat("hpf_freq", freq)
             }
@@ -356,7 +358,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.seekBarLpf.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
-                val freq = p * 190.0f + 1000.0f // 1kHz to 20kHz
+                val freq = AudioParameterMapper.progressToLpfFreq(p)
                 AudioEngineLib.setLpfFreq(freq) 
                 settingsManager.saveFloat("lpf_freq", freq)
             }
@@ -366,7 +368,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.seekBarLimiter.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
-                val thresh = p / 100.0f // 0.0 to 1.0
+                val thresh = AudioParameterMapper.progressToLimiterThreshold(p)
                 AudioEngineLib.setLimiterThreshold(thresh) 
                 settingsManager.saveFloat("limiter_thresh", thresh)
             }
@@ -376,7 +378,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.seekBarTransient.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
-                val strength = p / 100.0f // 0.0 to 1.0
+                val strength = AudioParameterMapper.progressToTransientSuppression(p)
                 AudioEngineLib.setTransientSuppression(strength) 
                 settingsManager.saveFloat("transient_suppression", strength)
             }
@@ -386,7 +388,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.seekBarNoiseGate.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
-                val thresh = p / 200.0f
+                val thresh = AudioParameterMapper.progressToNoiseGateThreshold(p)
                 AudioEngineLib.setNoiseGateThreshold(thresh) 
                 settingsManager.saveFloat(AudioSettingsManager.KEY_NOISE_GATE, thresh)
             }
@@ -396,7 +398,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.seekBarMbRatio.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
-                val ratio = 1.0f + (p / 10.0f) // 1.0 to 11.0
+                val ratio = AudioParameterMapper.progressToMbCompressionRatio(p)
                 AudioEngineLib.setMbCompression(ratio) 
                 settingsManager.saveFloat("mb_compression", ratio)
             }
@@ -416,7 +418,7 @@ class MainActivity : AppCompatActivity() {
         eqSeekBars.forEachIndexed { index, seekBar ->
             seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
-                    val gainDb = (p - 100) * 0.12f
+                    val gainDb = AudioParameterMapper.progressToEqBandGain(p)
                     AudioEngineLib.setEqualizerBandGain(index, gainDb)
                     settingsManager.saveFloat("band_$index", gainDb)
                 }
