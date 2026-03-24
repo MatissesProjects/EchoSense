@@ -95,6 +95,7 @@ void AudioEngine::setSpectralReduction(float strength) { mSpectralReductionStren
 void AudioEngine::setSpectralGateThreshold(float threshold) { mSpectralGateThreshold.store(threshold); }
 void AudioEngine::setDereverbStrength(float strength) { mDereverbStrength.store(strength); }
 void AudioEngine::setHpssStrength(float strength) { mHpssStrength.store(strength); }
+void AudioEngine::setFreqWarpStrength(float strength) { mFreqWarpStrength.store(strength); }
 void AudioEngine::setMasterGain(float gain) { mMasterGain.store(gain); }
 
 void AudioEngine::setEqualizerBandGain(int bandIndex, float gainDb) {
@@ -273,10 +274,11 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
     float specGate = mSpectralGateThreshold.load();
     float dereverb = mDereverbStrength.load();
     float hpss = mHpssStrength.load();
-    if (reduction > 0.01f || specGate > 0.001f || dereverb > 0.01f || hpss > 0.01f) {
+    float warp = mFreqWarpStrength.load();
+    if (reduction > 0.01f || specGate > 0.001f || dereverb > 0.01f || hpss > 0.01f || warp > 0.01f) {
         for (int j = 0; j < numFrames; j += FFT_SIZE) {
             if (j + FFT_SIZE <= numFrames) {
-                mSpectralProcessor->processBlock(outputBuffer + j, mNoiseProfile, reduction, specGate, dereverb, hpss);
+                mSpectralProcessor->processBlock(outputBuffer + j, mNoiseProfile, reduction, specGate, dereverb, hpss, warp);
             }
         }
     }

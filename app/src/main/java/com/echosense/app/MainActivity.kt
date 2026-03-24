@@ -432,6 +432,16 @@ class MainActivity : AppCompatActivity() {
             override fun onStartTrackingTouch(s: SeekBar?) {}
             override fun onStopTrackingTouch(s: SeekBar?) {}
         })
+
+        binding.seekBarFreqWarp.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
+                val strength = p / 100.0f
+                AudioEngineLib.setFreqWarpStrength(strength) 
+                settingsManager.saveFloat("freq_warp_strength", strength)
+            }
+            override fun onStartTrackingTouch(s: SeekBar?) {}
+            override fun onStopTrackingTouch(s: SeekBar?) {}
+        })
     }
 
     private fun updateBluetoothUi() {
