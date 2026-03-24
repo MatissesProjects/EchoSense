@@ -128,10 +128,9 @@ class MainActivity : AppCompatActivity() {
         binding.seekBarMbRatio.progress = AudioParameterMapper.mbCompressionRatioToProgress(settingsManager.getFloat("mb_compression", 1.0f))
 
         val speakerId = settingsManager.getInt(AudioSettingsManager.KEY_TARGET_SPEAKER, -1)
-        when (speakerId) {
-            0 -> binding.chipGroupSpeaker.check(R.id.chipSpeakerA)
-            1 -> binding.chipGroupSpeaker.check(R.id.chipSpeakerB)
-            else -> binding.chipGroupSpeaker.check(R.id.chipSpeakerNone)
+        // Dynamic speakers will be checked in refreshSpeakerList
+        if (speakerId == -1) {
+            binding.chipGroupSpeaker.check(R.id.chipSpeakerNone)
         }
 
         binding.seekBarBand1.progress = AudioParameterMapper.eqBandGainToProgress(settingsManager.getFloat("band_0", 0.0f))
@@ -549,9 +548,9 @@ class MainActivity : AppCompatActivity() {
             // Visual feedback of activity
             if (speaker.isActive) {
                 chip.chipIcon = ContextCompat.getDrawable(this, android.R.drawable.ic_btn_speak_now)
-                chip.isIconVisible = true
+                chip.isChipIconVisible = true
             } else {
-                chip.isIconVisible = false
+                chip.isChipIconVisible = false
             }
         }
     }

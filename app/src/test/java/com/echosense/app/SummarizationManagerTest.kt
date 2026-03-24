@@ -16,6 +16,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 import com.google.ai.client.generativeai.GenerativeModel
+import com.google.ai.client.generativeai.type.Content
 import com.google.ai.client.generativeai.type.GenerateContentResponse
 import org.mockito.kotlin.*
 import kotlinx.coroutines.runBlocking
@@ -68,7 +69,7 @@ class SummarizationManagerTest {
         val mockResponse: GenerateContentResponse = mock {
             on { text } doReturn "This is a summary"
         }
-        whenever(mockGenerativeModel.generateContent(any())).thenReturn(mockResponse)
+        whenever(mockGenerativeModel.generateContent(any<Content>())).thenReturn(mockResponse)
         
         val summary = summarizationManager.getRecentNotesSummary()
         
@@ -82,7 +83,7 @@ class SummarizationManagerTest {
         val dao = db.conversationNoteDao()
         dao.insertNote(ConversationNote(text = "Hello", timestamp = 1000))
         
-        whenever(mockGenerativeModel.generateContent(any())).thenThrow(RuntimeException("API Error"))
+        whenever(mockGenerativeModel.generateContent(any<Content>())).thenThrow(RuntimeException("API Error"))
         
         val summary = summarizationManager.getRecentNotesSummary()
         

@@ -14,7 +14,10 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
 import android.view.View
+import android.view.ViewGroup
 import android.widget.LinearLayout
+import androidx.recyclerview.widget.RecyclerView
+import androidx.wear.widget.WearableLinearLayoutManager
 import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.CoroutineScope
@@ -27,7 +30,6 @@ import kotlinx.coroutines.tasks.await
 class MainActivity : AppCompatActivity() {
 
     private lateinit var tvStatus: TextView
-    private lateinit var speakerLayout: LinearLayout
     private val uiScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private val SPEAKER_INFO_PATH = "/speaker_info"
@@ -47,18 +49,9 @@ class MainActivity : AppCompatActivity() {
         val btnToggle = findViewById<Button>(R.id.btnToggleWatchMic)
         tvStatus = findViewById<TextView>(R.id.tvWatchStatus)
 
-        // We'll use a simple layout for the prototype instead of full adapter
-        speakerLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.vertical
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        }
-        findViewById<androidx.wear.widget.ScalingLazyColumn>(R.id.recyclerSpeakers).apply {
+        findViewById<RecyclerView>(R.id.recyclerSpeakers).apply {
+            layoutManager = WearableLinearLayoutManager(this@MainActivity)
             visibility = View.VISIBLE
-            // Note: In a real app we'd use a ScalingLazyColumn.Adapter, 
-            // but for this direct prototype we'll just use the list view.
         }
 
         btnToggle.setOnClickListener {
@@ -95,31 +88,41 @@ class MainActivity : AppCompatActivity() {
         val speakerStrings = data.split("|")
 
         uiScope.launch {
-            // Re-using the ScalingLazyColumn as a container for this prototype
-            val container = findViewById<androidx.wear.widget.ScalingLazyColumn>(R.id.recyclerSpeakers)
-            container.removeAllViews() 
+            val recyclerView = findViewById<RecyclerView>(R.id.recyclerSpeakers)
 
-            speakerStrings.forEach { s ->
-                val parts = s.split(":")
-                if (parts.size == 3) {
-                    val id = parts[0]
-                    val name = parts[1]
-                    val isActive = parts[2].toBoolean()
-
+            // Simple dynamic adapter for the prototype
+            recyclerView.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+                override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
                     val btn = Button(this@MainActivity).apply {
-                        text = if (isActive) "● $name" else name
-                        textSize = 10f
-                        setOnClickListener {
-                            sendTargetSpeaker(id)
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT
+                        )
+                    }
+                    return object : RecyclerView.ViewHolder(btn) {}
+                }
+
+                override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+                    val parts = speakerStrings[position].split(":")
+                    if (parts.size == 3) {
+                        val id = parts[0]
+                        val name = parts[1]
+                        val isActive = parts[2].toBoolean()
+
+                        (holder.itemView as Button).apply {
+                            text = if (isActive) "● $name" else name
+                            textSize = 10f
+                            setOnClickListener {
+                                sendTargetSpeaker(id)
+                            }
                         }
                     }
-                    container.addView(btn)
                 }
+
+                override fun getItemCount(): Int = speakerStrings.size
             }
         }
-    }
-
-    private fun sendTargetSpeaker(id: String) {
+    }    private fun sendTargetSpeaker(id: String) {
         uiScope.launch(Dispatchers.IO) {
             try {
                 val nodes = Wearable.getNodeClient(this@MainActivity).connectedNodes.await()
