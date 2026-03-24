@@ -527,9 +527,11 @@ class MainActivity : AppCompatActivity() {
                 if (AudioEngineLib.isAudioEngineRunning()) {
                     val volume = AudioEngineLib.getVolumeLevel()
                     binding.progressBarVolume.progress = (volume * 500).toInt().coerceIn(0, 100)
+                    
+                    val isolation = AudioEngineLib.getIsolationGainDb()
                     AudioEngineLib.getFftData(fftData)
                     AudioEngineLib.getEqCurveData(eqCurveData)
-                    binding.visualizerView.updateData(fftData, eqCurveData)
+                    binding.visualizerView.updateData(fftData, eqCurveData, isolation)
                 }
                 delay(33)
             }

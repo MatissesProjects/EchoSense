@@ -26,12 +26,21 @@ class FrequencyVisualizerView(context: Context, attrs: AttributeSet?) : View(con
         strokeWidth = 1f
     }
 
+    private val isolationPaint = Paint().apply {
+        color = Color.parseColor("#B2FF59") // Volt Green
+        textSize = 32f
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        isAntiAlias = true
+    }
+
     private var fftData: FloatArray = FloatArray(0)
     private var eqCurveData: FloatArray = FloatArray(0)
+    private var isolationGainDb: Float = 0.0f
 
-    fun updateData(fft: FloatArray, curve: FloatArray) {
+    fun updateData(fft: FloatArray, curve: FloatArray, isolation: Float = 0.0f) {
         fftData = fft
         eqCurveData = curve
+        isolationGainDb = isolation
         postInvalidateOnAnimation()
     }
 
@@ -41,6 +50,14 @@ class FrequencyVisualizerView(context: Context, attrs: AttributeSet?) : View(con
         drawGrid(canvas)
         drawSpectrum(canvas)
         drawEqCurve(canvas)
+        drawIsolationText(canvas)
+    }
+
+    private fun drawIsolationText(canvas: Canvas) {
+        if (isolationGainDb > 0.1f) {
+            val text = String.format("AI ISOLATION: +%.1f dB", isolationGainDb)
+            canvas.drawText(text, width - 350f, 50f, isolationPaint)
+        }
     }
 
     private fun drawGrid(canvas: Canvas) {

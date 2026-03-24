@@ -33,8 +33,8 @@ object AudioEngineLib {
     external fun setMbCompression(ratio: Float)
     external fun setBeamforming(enabled: Boolean)
     external fun setEqualizerBandGain(bandIndex: Int, gain: Float)
-    
     external fun getVolumeLevel(): Float
+    external fun getIsolationGainDb(): Float
     external fun getDominantMic(): Int
     external fun getFftData(output: FloatArray)
     external fun getEqCurveData(output: FloatArray)

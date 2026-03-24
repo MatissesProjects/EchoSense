@@ -134,6 +134,8 @@ public:
     void getEqCurveData(float* output, int size);
     void autoTune();
 
+    float getIsolationGainDb() const { return mIsolationGainDb.load(); }
+
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) override;
 
 private:
@@ -178,6 +180,7 @@ private:
     std::atomic<float> mCurrentVolume{0.0f};
     std::atomic<float> mPhoneEnergy{0.0f};
     std::atomic<float> mWatchEnergy{0.0f};
+    std::atomic<float> mIsolationGainDb{0.0f};
     std::atomic<bool> mParamsChanged{true};
 
     std::atomic<float> mTransientSuppressionStrength{0.0f};

@@ -122,6 +122,10 @@ JNIEXPORT jfloat JNICALL JNI_METHOD(getVolumeLevel)(JNIEnv *env, jobject) {
     return (audioEngine != nullptr) ? audioEngine->getVolumeLevel() : 0.0f;
 }
 
+JNIEXPORT jfloat JNICALL JNI_METHOD(getIsolationGainDb)(JNIEnv *env, jobject) {
+    return (audioEngine != nullptr) ? audioEngine->getIsolationGainDb() : 0.0f;
+}
+
 JNIEXPORT jint JNICALL JNI_METHOD(getDominantMic)(JNIEnv *env, jobject) {
     return (audioEngine != nullptr) ? audioEngine->getDominantMic() : 0;
 }

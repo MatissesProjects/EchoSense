@@ -360,6 +360,11 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
     float reduction = mSpectralReductionStrength.load();
     float specGate = mSpectralGateThreshold.load();
     
+    float energyBefore = 0.0f;
+    if (reduction > 0.01f || specGate > 0.001f) {
+        for (int i = 0; i < numFrames; i++) energyBefore += outputBuffer[i] * outputBuffer[i];
+    }
+
     if (mLearningNoise.load()) {
         for (int i = 0; i < numFrames; i += FFT_SIZE) {
             if (i + FFT_SIZE <= numFrames) {
@@ -421,6 +426,21 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
     }
 
     if (fusion) mNoiseGateThreshold.store(baseThreshold);
+
+    // Calculate Isolation Gain (reduction achieved by AI)
+    if (reduction > 0.01f || specGate > 0.001f) {
+        float energyAfter = 0.0f;
+        for (int i = 0; i < numFrames; i++) energyAfter += outputBuffer[i] * outputBuffer[i];
+        
+        float gain = 0.0f;
+        if (energyBefore > 1e-9f) {
+            gain = 10.0f * log10f(energyBefore / (energyAfter + 1e-9f));
+        }
+        // Smooth the display value
+        mIsolationGainDb.store(mIsolationGainDb.load() * 0.9f + std::max(0.0f, gain) * 0.1f);
+    } else {
+        mIsolationGainDb.store(0.0f);
+    }
 
     updateVisualization(outputBuffer, numFrames);
     return oboe::DataCallbackResult::Continue;
