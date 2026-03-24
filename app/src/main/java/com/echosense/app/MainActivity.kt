@@ -104,6 +104,7 @@ class MainActivity : AppCompatActivity() {
         binding.seekBarDereverb.progress = AudioParameterMapper.dereverbToProgress(settingsManager.getFloat("dereverb_strength", 0.0f))
         binding.seekBarHpss.progress = AudioParameterMapper.hpssToProgress(settingsManager.getFloat("hpss_strength", 0.0f))
         binding.seekBarNeuralMask.progress = AudioParameterMapper.neuralMaskToProgress(settingsManager.getFloat("neural_mask_strength", 0.0f))
+        binding.seekBarBassBoost.progress = AudioParameterMapper.bassBoostToProgress(settingsManager.getFloat("bass_boost_strength", 0.0f))
         binding.seekBarNoiseGate.progress = AudioParameterMapper.noiseGateThresholdToProgress(settingsManager.getFloat(AudioSettingsManager.KEY_NOISE_GATE, 0.0f))
         binding.seekBarWatchGain.progress = AudioParameterMapper.watchGainToProgress(settingsManager.getFloat(AudioSettingsManager.KEY_WATCH_GAIN, 2.0f))
         
@@ -449,6 +450,16 @@ class MainActivity : AppCompatActivity() {
                 val strength = AudioParameterMapper.progressToNeuralMask(p)
                 AudioEngineLib.setNeuralMaskStrength(strength) 
                 settingsManager.saveFloat("neural_mask_strength", strength)
+            }
+            override fun onStartTrackingTouch(s: SeekBar?) {}
+            override fun onStopTrackingTouch(s: SeekBar?) {}
+        })
+
+        binding.seekBarBassBoost.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
+                val strength = AudioParameterMapper.progressToBassBoost(p)
+                AudioEngineLib.setBassBoostStrength(strength) 
+                settingsManager.saveFloat("bass_boost_strength", strength)
             }
             override fun onStartTrackingTouch(s: SeekBar?) {}
             override fun onStopTrackingTouch(s: SeekBar?) {}

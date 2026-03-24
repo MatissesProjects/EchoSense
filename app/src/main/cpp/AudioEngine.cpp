@@ -97,6 +97,7 @@ void AudioEngine::setDereverbStrength(float strength) { mDereverbStrength.store(
 void AudioEngine::setHpssStrength(float strength) { mHpssStrength.store(strength); }
 void AudioEngine::setFreqWarpStrength(float strength) { mFreqWarpStrength.store(strength); }
 void AudioEngine::setNeuralMaskStrength(float strength) { mNeuralMaskStrength.store(strength); }
+void AudioEngine::setBassBoostStrength(float strength) { mBassBoostStrength.store(strength); mParamsChanged.store(true); }
 void AudioEngine::setMasterGain(float gain) { mMasterGain.store(gain); }
 
 void AudioEngine::setEqualizerBandGain(int bandIndex, float gainDb) {
@@ -186,6 +187,11 @@ void AudioEngine::updateFilters() {
         mVoiceFilters[0].setPeaking(700.0f, mSampleRate, 0.4f, mVoiceBoostDb.load() * 0.4f);
         mVoiceFilters[1].setPeaking(3200.0f, mSampleRate, 0.4f, mVoiceBoostDb.load() * 0.8f);
     }
+    
+    // Virtual Bass Filters
+    mBassHpf.setHighPass(40.0f, mSampleRate, 0.707f);
+    mBassLpf.setLowPass(120.0f, mSampleRate, 0.707f);
+    
     mParamsChanged.store(false);
 }
 
@@ -291,6 +297,21 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
     mVoiceFilters[0].processBlock(outputBuffer, numFrames);
     mVoiceFilters[1].processBlock(outputBuffer, numFrames);
     for (int b = 0; b < 5; b++) mEQBands[b].processBlock(outputBuffer, numFrames);
+
+    // --- Virtual Bass Enhancement ---
+    float bassStrength = mBassBoostStrength.load();
+    if (bassStrength > 0.01f) {
+        for (int i = 0; i < numFrames; i++) {
+            float in = outputBuffer[i];
+            // Extract low end
+            float low = mBassHpf.process(in);
+            low = mBassLpf.process(low);
+            // Generate harmonics via soft clipping (tanh approximation)
+            float harmonic = low * (1.5f - 0.5f * low * low);
+            // Mix back in
+            outputBuffer[i] = in + (harmonic * bassStrength * 0.3f);
+        }
+    }
 
     // 5. Dynamics & Protection
     float limit = mLimiterThreshold.load();

@@ -198,6 +198,20 @@
             android:layout_height="wrap_content"
             android:max="100"
             android:progress="0"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Psychoacoustic Bass Enhancement (Virtual Pitch)"
+            android:textColor="#BBBBBB"
+            android:textSize="12sp" />
+        <SeekBar
+            android:id="@+id/seekBarBassBoost"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="0"
             android:layout_marginBottom="16dp" />        <!-- Profiles Section -->
         <TextView
             android:layout_width="wrap_content"

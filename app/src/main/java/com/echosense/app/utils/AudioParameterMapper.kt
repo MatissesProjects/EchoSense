@@ -60,6 +60,11 @@ object AudioParameterMapper {
     fun progressToNeuralMask(progress: Int): Float = progress / 100.0f
 
     /**
+     * Maps seek bar progress (0-100) to Bass Boost Strength (0.0 to 1.0)
+     */
+    fun progressToBassBoost(progress: Int): Float = progress / 100.0f
+
+    /**
      * Maps seek bar progress (0-100) to Multi-band Compression Ratio (1.0 to 11.0)
      */
     fun progressToMbCompressionRatio(progress: Int): Float = 1.0f + (progress / 10.0f)
@@ -88,6 +93,7 @@ object AudioParameterMapper {
     fun dereverbToProgress(strength: Float): Int = (strength * 100).roundToInt()
     fun hpssToProgress(strength: Float): Int = (strength * 100).roundToInt()
     fun neuralMaskToProgress(strength: Float): Int = (strength * 100).roundToInt()
+    fun bassBoostToProgress(strength: Float): Int = (strength * 100).roundToInt()
     fun mbCompressionRatioToProgress(ratio: Float): Int = ((ratio - 1.0f) * 10).roundToInt()
     fun eqBandGainToProgress(gainDb: Float): Int = (gainDb / 0.12f + 100).roundToInt()
     fun watchGainToProgress(gain: Float): Int = (gain * 20).roundToInt()
