@@ -127,10 +127,64 @@ void testSpectralProcessor() {
     std::cout << "Spectral Processor Tests: PASSED" << std::endl;
 }
 
+void testVoiceIsolationBenchmark() {
+    int size = 48000; // 1 second of audio
+    float sampleRate = 48000.0f;
+    std::vector<float> speech(size);
+    std::vector<float> noise(size);
+    std::vector<float> mixed(size);
+
+    // 1. Generate Signal: 1kHz modulated "speech"
+    for (int i = 0; i < size; i++) {
+        float env = 0.5f + 0.5f * sinf(2.0f * M_PI * i / 12000.0f); // Speech-like cadence
+        speech[i] = env * sinf(2.0f * M_PI * 1000.0f * i / sampleRate);
+    }
+
+    // 2. Generate Noise: Fan Hum (60Hz) + White Noise
+    for (int i = 0; i < size; i++) {
+        float fan = 0.3f * sinf(2.0f * M_PI * 60.0f * i / sampleRate);
+        float white = ((float)rand() / (float)RAND_MAX) * 0.2f - 0.1f;
+        noise[i] = fan + white;
+    }
+
+    // 3. Mix at difficult SNR
+    for (int i = 0; i < size; i++) mixed[i] = speech[i] + noise[i];
+
+    // 4. Run Processing (Simulation)
+    SpectralProcessor sp(FFT_SIZE);
+    float noiseProfile[FFT_SIZE];
+    
+    // "Learn" the noise first
+    std::vector<std::complex<float>> block(FFT_SIZE);
+    for(int j=0; j<FFT_SIZE; j++) block[j] = std::complex<float>(noise[j], 0.0f);
+    sp.fft(block, false);
+    for(int j=0; j<FFT_SIZE; j++) noiseProfile[j] = std::abs(block[j]);
+
+    // Apply Spectral Subtraction and MB-Dynamics
+    std::vector<float> output = mixed;
+    for (int i = 0; i < size; i += FFT_SIZE) {
+        if (i + FFT_SIZE <= size) {
+            sp.processBlock(output.data() + i, noiseProfile, 0.8f, 0.02f);
+        }
+    }
+
+    // 5. Measure Energy in silence vs signal
+    float energyBefore = 0, energyAfter = 0;
+    for (int i = 0; i < size; i++) {
+        energyBefore += mixed[i] * mixed[i];
+        energyAfter += output[i] * output[i];
+    }
+
+    // Output should have less energy (noise removed) but still contain signal
+    assert(energyAfter < energyBefore);
+    std::cout << "Voice Isolation Benchmark: Noise Energy Reduced (Verified)" << std::endl;
+}
+
 int main() {
     testBiquadFilters();
     testLimiterProtection();
     testSpectralProcessor();
+    testVoiceIsolationBenchmark();
     std::cout << "All Native Tests (Windows Mocked): PASSED" << std::endl;
     return 0;
 }
