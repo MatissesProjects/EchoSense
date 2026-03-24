@@ -19,6 +19,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.tasks.await
 import java.io.OutputStream
 
+import androidx.core.content.ContextCompat
+
 class WearSensorService : Service() {
 
     private val TAG = "EchoSenseWearService"
@@ -27,7 +29,7 @@ class WearSensorService : Service() {
     private val WEAR_AUDIO_CHANNEL = "/audio_stream_channel"
 
     private var isRecording = false
-    private var serviceJob: Job? = null
+    private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     override fun onCreate() {
         super.onCreate()
@@ -41,7 +43,14 @@ class WearSensorService : Service() {
         }
 
         startForeground(NOTIFICATION_ID, createNotification())
-        startStreaming()
+        
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            startStreaming()
+        } else {
+            Log.e(TAG, "RECORD_AUDIO permission not granted")
+            stopSelf()
+        }
+        
         return START_STICKY
     }
 
@@ -51,7 +60,7 @@ class WearSensorService : Service() {
         if (isRecording) return
         isRecording = true
         
-        serviceJob = CoroutineScope(Dispatchers.IO).launch {
+        serviceScope.launch {
             Log.d(TAG, "Streaming Coroutine Started - Waiting for Data Layer")
             delay(2000) // Give Data Layer a moment to sync
             
@@ -104,8 +113,9 @@ class WearSensorService : Service() {
     }
 
     override fun onDestroy() {
+        Log.d(TAG, "Service being destroyed")
         isRecording = false
-        serviceJob?.cancel()
+        serviceScope.cancel()
         super.onDestroy()
     }
 

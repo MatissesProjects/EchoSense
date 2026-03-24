@@ -10,13 +10,12 @@ import androidx.core.app.NotificationCompat
 import com.google.android.gms.wearable.ChannelClient
 import com.google.android.gms.wearable.ChannelClient.Channel
 import com.google.android.gms.wearable.Wearable
+import com.echosense.app.utils.AudioConverter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import java.io.InputStream
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 
 class EchoSenseService : Service() {
 
@@ -26,7 +25,7 @@ class EchoSenseService : Service() {
     private val WEAR_AUDIO_CHANNEL = "/audio_stream_channel"
 
     private lateinit var channelClient: ChannelClient
-    private var channelJob: Job? = null
+    private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private val channelCallback = object : ChannelClient.ChannelCallback() {
         override fun onChannelOpened(channel: Channel) {
@@ -70,20 +69,18 @@ class EchoSenseService : Service() {
     override fun onDestroy() {
         Log.d(TAG, "Service being destroyed")
         channelClient.unregisterChannelCallback(channelCallback)
-        channelJob?.cancel()
+        serviceScope.cancel()
         AudioEngineLib.stopAudioEngine()
         super.onDestroy()
     }
 
     private fun receiveAudioStream(channel: Channel) {
         Log.d(TAG, "Starting to receive audio stream from channel")
-        channelJob?.cancel()
-        channelJob = CoroutineScope(Dispatchers.IO).launch {
+        serviceScope.launch {
             try {
                 val inputStream = channelClient.getInputStream(channel).await()
                 Log.d(TAG, "InputStream acquired on phone")
                 val buffer = ByteArray(4096)
-                val floatArray = FloatArray(2048)
 
                 var totalBytesRead = 0L
                 while (true) {
@@ -96,16 +93,8 @@ class EchoSenseService : Service() {
                     totalBytesRead += read
                     if (totalBytesRead % 32000 == 0L) Log.d(TAG, "Read $totalBytesRead bytes on phone...")
 
-                    val shortBuffer = ByteBuffer.wrap(buffer, 0, read).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
-                    val shortsToRead = shortBuffer.remaining()
-                    if (shortsToRead > floatArray.size) {
-                        // This shouldn't happen with 4096 byte buffer and 2048 float array
-                        continue
-                    }
-                    for (i in 0 until shortsToRead) {
-                        floatArray[i] = shortBuffer.get().toFloat() / 32768.0f
-                    }
-                    AudioEngineLib.writeRemoteAudio(floatArray.copyOf(shortsToRead))
+                    val floatArray = AudioConverter.pcmToFloat(buffer, read)
+                    AudioEngineLib.writeRemoteAudio(floatArray)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error in receiveAudioStream", e)
