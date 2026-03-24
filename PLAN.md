@@ -81,6 +81,14 @@ EchoSense is an Android-first application designed to act as an intelligent, con
 * [x] **Neural Multi-band Gate:** Implement 64-bin spectral gating to isolate vocals from overlapping background noise.
 * [x] **Gemini Nano (AICore) Summarization:** Use the Pixel 9's on-device LLM to summarize conversation notes stored in the Room DB.
 
+### Phase 7: Advanced Adaptive & Neural Filtering
+* [ ] **Adaptive LMS Noise Cancellation:** Use the Watch/Remote mic as a noise reference to dynamically cancel ambient sounds from the Phone mic in real-time.
+* [ ] **Spectral De-Reverberation:** Suppress late reflections in echoey environments to dry out and clarify speech.
+* [ ] **Harmonic-Percussive Source Separation (HPSS):** Separate steady voices from sharp percussive noises (typing, clicks) for aggressive transient ducking.
+* [ ] **Frequency Compression/Shifting:** Move high-frequency vocal details into lower audible ranges for users with high-frequency hearing loss.
+* [ ] **Multi-Band Neural Masking:** Use a specialized RNN/GRU gain mask to clean speech from non-stationary noise.
+* [ ] **Psychoacoustic Bass Enhancement:** Generate harmonic overtones to improve perceived low-end on small speakers/earbuds.
+
 ## 6. Known Risks & Mitigations
 1.  **Audio Stream Collisions:** Android limits how many apps/services can access the mic simultaneously. Mitigated by carefully managing the `AudioRecord` lifecycle and building a robust internal audio mixer.
 2.  **Battery Drain:** Mitigated by offering a "Passive Mode" (audio boost only) and an "Active Mode" (audio + transcription + AI).

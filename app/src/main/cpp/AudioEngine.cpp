@@ -226,27 +226,21 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
         }
     }
 
-    // --- AI Beamforming ---
+    // --- AI Beamforming (Adaptive LMS Cancellation) ---
     if (mBeamformingEnabled.load() && fusion && source != InputSource::Watch) {
-        float remoteGain = mRemoteGain.load() * 0.5f; 
+        float remoteGain = mRemoteGain.load(); 
         mRemoteReadPos = (mRemoteReadPos - numFrames + REMOTE_BUFFER_SIZE) % REMOTE_BUFFER_SIZE;
         
-        int i = 0;
-#if defined(__ARM_NEON)
-        float32x4_t vGain = vdupq_n_f32(remoteGain);
-        for (; i <= numFrames - 4; i += 4) {
-            float32x4_t vPhone = vld1q_f32(outputBuffer + i);
-            float noiseSamples[4];
-            for(int j=0; j<4; j++) noiseSamples[j] = mRemoteBuffer[(mRemoteReadPos + i + j) % REMOTE_BUFFER_SIZE];
-            float32x4_t vNoise = vld1q_f32(noiseSamples);
-            float32x4_t vResult = vsubq_f32(vPhone, vmulq_f32(vNoise, vGain));
-            vst1q_f32(outputBuffer + i, vResult);
+        // Prepare temporary reference buffer with gain applied
+        float noiseRef[numFrames];
+        for (int i = 0; i < numFrames; i++) {
+            noiseRef[i] = mRemoteBuffer[(mRemoteReadPos + i) % REMOTE_BUFFER_SIZE] * remoteGain;
         }
-#endif
-        for (; i < numFrames; i++) {
-            float noiseRef = mRemoteBuffer[(mRemoteReadPos + i) % REMOTE_BUFFER_SIZE] * remoteGain;
-            outputBuffer[i] -= noiseRef;
-        }
+        
+        // Use Adaptive LMS to cancel noise from outputBuffer (phone) 
+        // using noiseRef (watch) as the reference.
+        mLmsFilter.processBlock(outputBuffer, noiseRef, numFrames);
+
         mRemoteReadPos = (mRemoteReadPos + numFrames) % REMOTE_BUFFER_SIZE;
     }
 

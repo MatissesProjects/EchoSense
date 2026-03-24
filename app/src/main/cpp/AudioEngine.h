@@ -7,6 +7,7 @@
 #include <vector>
 #include <mutex>
 #include "SpectralProcessor.h"
+#include "LMSFilter.h"
 
 #define VIS_BINS 64
 #define REMOTE_BUFFER_SIZE 4096
@@ -216,6 +217,9 @@ private:
     Biquad mLowPass;
     Biquad mEQBands[5];
     Biquad mVoiceFilters[2];
+
+    // Adaptive Filters
+    LMSFilter mLmsFilter;
 
     // Spectral AI
     SpectralProcessor* mSpectralProcessor = nullptr;
