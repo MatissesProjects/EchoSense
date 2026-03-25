@@ -3,6 +3,7 @@ package com.echosense.app
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -33,6 +34,33 @@ class EchoSenseService : Service() {
     private lateinit var channelClient: ChannelClient
     private lateinit var messageClient: MessageClient
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private lateinit var audioManager: AudioManager
+    
+    private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+        when (focusChange) {
+            AudioManager.AUDIOFOCUS_LOSS -> {
+                Log.d(TAG, "Audio focus lost permanently")
+                AudioEngineLib.stopAudioEngine()
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                Log.d(TAG, "Audio focus lost transiently - pausing")
+                AudioEngineLib.stopAudioEngine()
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                Log.d(TAG, "Audio focus lost transiently - ducking")
+                AudioEngineLib.setMasterGain(0.2f)
+            }
+            AudioManager.AUDIOFOCUS_GAIN -> {
+                Log.d(TAG, "Audio focus gained - resuming")
+                if (!AudioEngineLib.isAudioEngineRunning()) {
+                    AudioEngineLib.startAudioEngine()
+                    AudioEngineLib.restoreSettings(this)
+                }
+                val settings = AudioSettingsManager(this)
+                AudioEngineLib.setMasterGain(settings.getFloat(AudioSettingsManager.KEY_MASTER_GAIN, 1.0f))
+            }
+        }
+    }
 
     private val messageListener = MessageClient.OnMessageReceivedListener { messageEvent ->
         val data = String(messageEvent.data)
@@ -86,6 +114,8 @@ class EchoSenseService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        
         channelClient = Wearable.getChannelClient(this)
         channelClient.registerChannelCallback(channelCallback)
         
@@ -93,7 +123,7 @@ class EchoSenseService : Service() {
         messageClient.addListener(messageListener)
         
         startSpeakerInfoBroadcaster()
-        Log.d(TAG, "Service Created, ChannelCallback & MessageListener registered")
+        Log.d(TAG, "Service Created, Focus listener ready")
     }
 
     private fun startSpeakerInfoBroadcaster() {
@@ -130,9 +160,27 @@ class EchoSenseService : Service() {
         val notification = createNotification()
         startForeground(NOTIFICATION_ID, notification)
         
-        AudioEngineLib.startAudioEngine()
-        AudioEngineLib.restoreSettings(this)
-        Log.d(TAG, "Audio Engine started and settings restored")
+        // Request Audio Focus
+        val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val focusRequest = android.media.AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(android.media.AudioAttributes.Builder()
+                    .setUsage(android.media.AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build())
+                .setAcceptsDelayedFocusGain(true)
+                .setOnAudioFocusChangeListener(audioFocusChangeListener)
+                .build()
+            audioManager.requestAudioFocus(focusRequest)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.requestAudioFocus(audioFocusChangeListener, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN)
+        }
+
+        if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+            AudioEngineLib.startAudioEngine()
+            AudioEngineLib.restoreSettings(this)
+            Log.d(TAG, "Audio focus granted, Engine started")
+        }
         
         return START_STICKY
     }
@@ -141,6 +189,9 @@ class EchoSenseService : Service() {
 
     override fun onDestroy() {
         Log.d(TAG, "Service being destroyed")
+        if (::audioManager.isInitialized) {
+            audioManager.abandonAudioFocus(audioFocusChangeListener)
+        }
         channelClient.unregisterChannelCallback(channelCallback)
         messageClient.removeListener(messageListener)
         serviceScope.cancel()
