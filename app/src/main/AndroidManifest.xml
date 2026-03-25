@@ -23,11 +23,26 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".HearingTestActivity" />
+
         <service
             android:name=".EchoSenseService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="microphone" />
+
+        <service
+            android:name=".EchoSenseAccessibilityService"
+            android:label="EchoSense Quick Controls"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
 
     </application>
 </manifest>

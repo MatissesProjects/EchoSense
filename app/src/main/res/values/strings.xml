@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">EchoSense</string>
+    <string name="accessibility_service_description">Provides a floating button for quick EchoSense profile toggles (Quiet, Crowd, etc.)</string>
 </resources>
