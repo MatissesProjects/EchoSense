@@ -233,6 +233,11 @@ private:
 
     // Adaptive Filters
     LMSFilter mLmsFilter;
+    LMSFilter mFeedbackCanceller;
+
+    float mPlaybackHistory[REMOTE_BUFFER_SIZE] = {0};
+    std::atomic<int32_t> mPlaybackHistoryReadPos{0};
+    std::atomic<int32_t> mPlaybackHistoryWritePos{0};
 
     // Protection
     Limiter* mLimiter = nullptr;

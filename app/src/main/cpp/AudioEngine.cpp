@@ -9,7 +9,7 @@
 
 #define TAG "AudioEngine"
 
-AudioEngine::AudioEngine() {
+AudioEngine::AudioEngine() : mLmsFilter(128, 0.01f), mFeedbackCanceller(512, 0.005f) {
     for (int i = 0; i < 5; ++i) {
         mManualBandGains[i].store(0.0f);
         mProfileBandGains[i].store(0.0f);
@@ -240,6 +240,15 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
                 for (int i = start; i < numFrames; i++) outputBuffer[i] = 0.0f;
             }
             
+            // --- Acoustic Feedback Cancellation (AFC) ---
+            // Use previous playback as reference to cancel leakage
+            float afcRef[numFrames];
+            for (int j = 0; j < numFrames; j++) {
+                afcRef[j] = mPlaybackHistory[(mPlaybackHistoryReadPos + j) % REMOTE_BUFFER_SIZE];
+            }
+            mFeedbackCanceller.processBlock(outputBuffer, afcRef, numFrames);
+            mPlaybackHistoryReadPos = (mPlaybackHistoryReadPos + numFrames) % REMOTE_BUFFER_SIZE;
+
             float sumSq = 0;
             for (int i = 0; i < numFrames; i++) sumSq += outputBuffer[i] * outputBuffer[i];
             phoneRMS = sqrtf(sumSq / (float)numFrames);
@@ -339,6 +348,13 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
     }
 
     updateVisualization(outputBuffer, numFrames);
+
+    // Store output in history for AFC reference in next blocks
+    for (int j = 0; j < numFrames; j++) {
+        mPlaybackHistory[mPlaybackHistoryWritePos] = outputBuffer[j];
+        mPlaybackHistoryWritePos = (mPlaybackHistoryWritePos + 1) % REMOTE_BUFFER_SIZE;
+    }
+
     return oboe::DataCallbackResult::Continue;
 }
 
