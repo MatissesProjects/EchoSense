@@ -1,21 +1,14 @@
 package com.echosense.wear
 
-import android.Manifest
 import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
+import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-
-import android.view.View
-import android.view.ViewGroup
-import android.widget.LinearLayout
 import androidx.recyclerview.widget.RecyclerView
 import androidx.wear.widget.WearableLinearLayoutManager
 import com.google.android.gms.wearable.MessageClient
@@ -34,11 +27,18 @@ class MainActivity : AppCompatActivity() {
 
     private val SPEAKER_INFO_PATH = "/speaker_info"
     private val SET_TARGET_SPEAKER_PATH = "/set_target_speaker"
+    private val TOGGLE_MIC_PATH = "/toggle_mic_source"
 
     private val messageListener = MessageClient.OnMessageReceivedListener { messageEvent ->
-        if (messageEvent.path == SPEAKER_INFO_PATH) {
-            val data = String(messageEvent.data)
-            refreshSpeakerList(data)
+        when (messageEvent.path) {
+            SPEAKER_INFO_PATH -> {
+                val data = String(messageEvent.data)
+                refreshSpeakerList(data)
+            }
+            "/status_update" -> {
+                val data = String(messageEvent.data)
+                tvStatus.text = data
+            }
         }
     }
 
@@ -46,26 +46,19 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        val btnToggle = findViewById<Button>(R.id.btnToggleWatchMic)
+        val btnFocus = findViewById<Button>(R.id.btnToggleWatchMic) // Reusing ID for Focus toggle
         tvStatus = findViewById<TextView>(R.id.tvWatchStatus)
+
+        btnFocus.text = "Switch Mic Focus"
+        tvStatus.text = "Remote Syncing..."
 
         findViewById<RecyclerView>(R.id.recyclerSpeakers).apply {
             layoutManager = WearableLinearLayoutManager(this@MainActivity)
             visibility = View.VISIBLE
         }
 
-        btnToggle.setOnClickListener {
-            if (isServiceRunning(WearSensorService::class.java)) {
-                stopSensorService()
-                btnToggle.text = "Start Watch Mic"
-                tvStatus.text = "Status: Idle"
-            } else {
-                if (checkPermissions()) {
-                    startSensorService()
-                    btnToggle.text = "Stop Mic"
-                    tvStatus.text = "Status: Streaming"
-                }
-            }
+        btnFocus.setOnClickListener {
+            sendCommand(TOGGLE_MIC_PATH, "toggle")
         }
 
         findViewById<Button>(R.id.btnRemoteFilters).setOnClickListener {
@@ -73,11 +66,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         Wearable.getMessageClient(this).addListener(messageListener)
-
-        // Initial UI state
-        if (isServiceRunning(WearSensorService::class.java)) {
-            btnToggle.text = "Stop Mic"
-            tvStatus.text = "Status: Streaming"
+        
+        // Start sync service if not running
+        if (!isServiceRunning(WearSensorService::class.java)) {
+            startService(Intent(this, WearSensorService::class.java))
         }
     }
 
@@ -89,12 +81,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshSpeakerList(data: String) {
         // data format: "id:name:isActive|id:name:isActive"
+        if (data.isEmpty()) return
         val speakerStrings = data.split("|")
 
         uiScope.launch {
             val recyclerView = findViewById<RecyclerView>(R.id.recyclerSpeakers)
-
-            // Simple dynamic adapter for the prototype
             recyclerView.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
                 override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
                     val btn = Button(this@MainActivity).apply {
@@ -108,16 +99,16 @@ class MainActivity : AppCompatActivity() {
 
                 override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
                     val parts = speakerStrings[position].split(":")
-                    if (parts.size == 3) {
+                    if (parts.size >= 2) {
                         val id = parts[0]
                         val name = parts[1]
-                        val isActive = parts[2].toBoolean()
+                        val isActive = if(parts.size > 2) parts[2].toBoolean() else false
 
                         (holder.itemView as Button).apply {
                             text = if (isActive) "● $name" else name
                             textSize = 10f
                             setOnClickListener {
-                                sendTargetSpeaker(id)
+                                sendCommand(SET_TARGET_SPEAKER_PATH, id)
                             }
                         }
                     }
@@ -126,47 +117,20 @@ class MainActivity : AppCompatActivity() {
                 override fun getItemCount(): Int = speakerStrings.size
             }
         }
-    }    private fun sendTargetSpeaker(id: String) {
+    }
+
+    private fun sendCommand(path: String, data: String) {
         uiScope.launch(Dispatchers.IO) {
             try {
                 val nodes = Wearable.getNodeClient(this@MainActivity).connectedNodes.await()
                 for (node in nodes) {
                     Wearable.getMessageClient(this@MainActivity)
-                        .sendMessage(node.id, SET_TARGET_SPEAKER_PATH, id.toByteArray())
+                        .sendMessage(node.id, path, data.toByteArray())
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
-    }
-
-    private fun checkPermissions(): Boolean {
-        val permissions = mutableListOf(Manifest.permission.RECORD_AUDIO)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-        }
-        
-        val missing = permissions.filter { 
-            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED 
-        }
-        
-        if (missing.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this, missing.toTypedArray(), 1)
-            return false
-        }
-        return true
-    }
-
-    private fun startSensorService() {
-        val intent = Intent(this, WearSensorService::class.java)
-        ContextCompat.startForegroundService(this, intent)
-    }
-
-    private fun stopSensorService() {
-        val intent = Intent(this, WearSensorService::class.java).apply {
-            action = "STOP_SERVICE"
-        }
-        startService(intent)
     }
 
     private fun isServiceRunning(serviceClass: Class<*>): Boolean {
