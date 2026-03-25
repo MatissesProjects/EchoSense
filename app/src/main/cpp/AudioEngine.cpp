@@ -20,6 +20,7 @@ AudioEngine::AudioEngine() {
 AudioEngine::~AudioEngine() {
     stop();
     delete mSpectralProcessor;
+    delete mLimiter;
 }
 
 bool AudioEngine::start() {
@@ -57,6 +58,9 @@ bool AudioEngine::start() {
         mPlaybackStream->close();
         return false;
     }
+
+    delete mLimiter;
+    mLimiter = new Limiter(mSampleRate);
 
     updateFilters();
     mRecordingStream->requestStart();
@@ -325,18 +329,13 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
 
     // 5. Dynamics & Protection
     float limit = mLimiterThreshold.load();
-    i = 0;
-#if defined(__ARM_NEON)
-    float32x4_t vLimit = vdupq_n_f32(limit);
-    float32x4_t vNegLimit = vdupq_n_f32(-limit);
-    for (; i <= numFrames - 4; i += 4) {
-        float32x4_t vOut = vld1q_f32(outputBuffer + i);
-        vOut = vmaxq_f32(vNegLimit, vminq_f32(vLimit, vOut));
-        vst1q_f32(outputBuffer + i, vOut);
-    }
-#endif
-    for (; i < numFrames; i++) {
-        outputBuffer[i] = std::clamp(outputBuffer[i], -limit, limit);
+    if (mLimiter) {
+        mLimiter->processBlock(outputBuffer, numFrames, limit);
+    } else {
+        // Fallback to hard clipping if limiter not initialized
+        for (int i = 0; i < numFrames; i++) {
+            outputBuffer[i] = std::clamp(outputBuffer[i], -limit, limit);
+        }
     }
 
     updateVisualization(outputBuffer, numFrames);

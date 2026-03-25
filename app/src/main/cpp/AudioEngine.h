@@ -8,6 +8,7 @@
 #include <mutex>
 #include "SpectralProcessor.h"
 #include "LMSFilter.h"
+#include "Limiter.h"
 
 #define VIS_BINS 64
 #define REMOTE_BUFFER_SIZE 4096
@@ -232,6 +233,9 @@ private:
 
     // Adaptive Filters
     LMSFilter mLmsFilter;
+
+    // Protection
+    Limiter* mLimiter = nullptr;
 
     // Spectral AI
     SpectralProcessor* mSpectralProcessor = nullptr;
