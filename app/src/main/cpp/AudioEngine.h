@@ -147,6 +147,8 @@ public:
     void setTransientSuppression(float strength);
     void setWindReduction(float strength);
     void setTone(float freq, float volume);
+    void setSelfVoiceSuppression(bool enabled);
+    void setBluetoothDelayComp(float ms);
     void learnNoise();
     float getVolumeLevel() const { return mCurrentVolume.load(); }
     struct SpeakerInfo {
@@ -220,6 +222,9 @@ private:
     std::atomic<float> mWatchEnergy{0.0f};
     std::atomic<float> mIsolationGainDb{0.0f};
     std::atomic<bool> mParamsChanged{true};
+
+    std::atomic<bool> mSelfVoiceSuppressionEnabled{false};
+    std::atomic<float> mBluetoothDelayCompMs{0.0f};
 
     std::atomic<float> mTransientSuppressionStrength{0.0f};
     float mEnergyEnvelope = 0.0f;

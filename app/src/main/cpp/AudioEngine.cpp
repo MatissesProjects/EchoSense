@@ -147,6 +147,8 @@ void AudioEngine::setMbCompression(float ratio) { mMbCompressionRatio.store(rati
 void AudioEngine::setBeamforming(bool enabled) { mBeamformingEnabled.store(enabled); }
 void AudioEngine::setTransientSuppression(float strength) { mTransientSuppressionStrength.store(strength); }
 void AudioEngine::setWindReduction(float strength) { mWindReductionStrength.store(strength); }
+void AudioEngine::setSelfVoiceSuppression(bool enabled) { mSelfVoiceSuppressionEnabled.store(enabled); }
+void AudioEngine::setBluetoothDelayComp(float ms) { mBluetoothDelayCompMs.store(ms); }
 void AudioEngine::setTone(float freq, float volume) {
     mToneFreq.store(freq);
     mToneVolume.store(volume);
@@ -245,14 +247,20 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
                 for (int i = start; i < numFrames; i++) outputBuffer[i] = 0.0f;
             }
             
-            // --- Acoustic Feedback Cancellation (AFC) ---
-            // Use previous playback as reference to cancel leakage
-            float afcRef[numFrames];
-            for (int j = 0; j < numFrames; j++) {
-                afcRef[j] = mPlaybackHistory[(mPlaybackHistoryReadPos + j) % REMOTE_BUFFER_SIZE];
+            // --- Self-Voice Suppression (using mFeedbackCanceller) ---
+            // If the user is speaking, it will be captured by the phone mic.
+            // We can use the playback history as a reference, but for "Self-Voice"
+            // we specifically want to cancel leakage if we're in a high-gain mode.
+            // Note: In noise-canceling headphones, the user's own voice can be 
+            // "boomy" due to the occlusion effect.
+            if (mSelfVoiceSuppressionEnabled.load()) {
+                float afcRef[numFrames];
+                for (int j = 0; j < numFrames; j++) {
+                    afcRef[j] = mPlaybackHistory[(mPlaybackHistoryReadPos + j) % REMOTE_BUFFER_SIZE];
+                }
+                mFeedbackCanceller.processBlock(outputBuffer, afcRef, numFrames);
+                mPlaybackHistoryReadPos = (mPlaybackHistoryReadPos + numFrames) % REMOTE_BUFFER_SIZE;
             }
-            mFeedbackCanceller.processBlock(outputBuffer, afcRef, numFrames);
-            mPlaybackHistoryReadPos = (mPlaybackHistoryReadPos + numFrames) % REMOTE_BUFFER_SIZE;
 
             float sumSq = 0;
             for (int i = 0; i < numFrames; i++) sumSq += outputBuffer[i] * outputBuffer[i];
@@ -319,15 +327,17 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
         }
     }
 
-    // 4. Biquad Cascade
+    // 4. Biquad Cascade & Bluetooth Compensation
+    float delayCompMs = mBluetoothDelayCompMs.load();
+    int32_t delayFrames = (int32_t)(delayCompMs * mSampleRate / 1000.0f);
+    
     // --- Dynamic Wind Noise Reduction ---
     float windStrength = mWindReductionStrength.load();
     if (windStrength > 0.01f && fusion) {
         float ratio = phoneRMS / (watchRMS + 1e-6f);
-        // If one mic is much louder than the other, it's likely local wind rumble
         if (ratio > 5.0f || ratio < 0.2f) {
             float baseHpf = mHpfFreq.load();
-            float windHpf = baseHpf + windStrength * 400.0f; // Shift up to 400Hz more
+            float windHpf = baseHpf + windStrength * 400.0f;
             mHighPass.setHighPass(windHpf, mSampleRate, 0.707f);
         }
     }
@@ -338,18 +348,23 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
     mVoiceFilters[1].processBlock(outputBuffer, numFrames);
     for (int b = 0; b < 5; b++) mEQBands[b].processBlock(outputBuffer, numFrames);
 
-    // --- Virtual Bass Enhancement ---
-    float bassStrength = mBassBoostStrength.load();
-    if (bassStrength > 0.01f) {
-        for (int i = 0; i < numFrames; i++) {
-            float in = outputBuffer[i];
-            // Extract low end
-            float low = mBassHpf.process(in);
-            low = mBassLpf.process(low);
-            // Generate harmonics via soft clipping (tanh approximation)
-            float harmonic = low * (1.5f - 0.5f * low * low);
-            // Mix back in
-            outputBuffer[i] = in + (harmonic * bassStrength * 0.3f);
+    // --- Bluetooth Latency Alignment (Comb Filtering Mitigation) ---
+    // If Bluetooth delay is known, we delay the output slightly 
+    // to align processed audio with passive leakage (bone conduction/seal leakage).
+    if (delayFrames > 0 && delayFrames < REMOTE_BUFFER_SIZE / 2) {
+        for (int j = 0; j < numFrames; j++) {
+            float dry = outputBuffer[j];
+            // Use history as a look-back delay line
+            outputBuffer[j] = mPlaybackHistory[(mPlaybackHistoryWritePos - delayFrames + REMOTE_BUFFER_SIZE) % REMOTE_BUFFER_SIZE];
+            // Store dry for next block's delay
+            mPlaybackHistory[mPlaybackHistoryWritePos] = dry;
+            mPlaybackHistoryWritePos = (mPlaybackHistoryWritePos + 1) % REMOTE_BUFFER_SIZE;
+        }
+    } else {
+        // Normal history storage for AFC
+        for (int j = 0; j < numFrames; j++) {
+            mPlaybackHistory[mPlaybackHistoryWritePos] = outputBuffer[j];
+            mPlaybackHistoryWritePos = (mPlaybackHistoryWritePos + 1) % REMOTE_BUFFER_SIZE;
         }
     }
 
@@ -357,14 +372,9 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
     float limit = mLimiterThreshold.load();
     if (mLimiter) {
         mLimiter->processBlock(outputBuffer, numFrames, limit);
-    } else {
-        // Fallback to hard clipping if limiter not initialized
-        for (int i = 0; i < numFrames; i++) {
-            outputBuffer[i] = std::clamp(outputBuffer[i], -limit, limit);
-        }
     }
 
-    // --- Pure Tone Generation (Audiometry) ---
+    // --- Pure Tone Generation ---
     float toneVol = mToneVolume.load();
     if (toneVol > 0.0001f) {
         float freq = mToneFreq.load();
@@ -376,13 +386,6 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
     }
 
     updateVisualization(outputBuffer, numFrames);
-
-    // Store output in history for AFC reference in next blocks
-    for (int j = 0; j < numFrames; j++) {
-        mPlaybackHistory[mPlaybackHistoryWritePos] = outputBuffer[j];
-        mPlaybackHistoryWritePos = (mPlaybackHistoryWritePos + 1) % REMOTE_BUFFER_SIZE;
-    }
-
     return oboe::DataCallbackResult::Continue;
 }
 

@@ -38,6 +38,8 @@ object AudioEngineLib {
     external fun setMbCompression(ratio: Float)
     external fun setBeamforming(enabled: Boolean)
     external fun setWindReduction(strength: Float)
+    external fun setSelfVoiceSuppression(enabled: Boolean)
+    external fun setBluetoothDelayComp(ms: Float)
     external fun setTone(freq: Float, volume: Float)
     external fun setEqualizerBandGain(bandIndex: Int, gain: Float)
     external fun getVolumeLevel(): Float
@@ -101,5 +103,8 @@ object AudioEngineLib {
         }
         
         setInputSource(settings.getInt(AudioSettingsManager.KEY_MIC_SOURCE, 0))
+        
+        setSelfVoiceSuppression(settings.prefs.getBoolean("self_voice_suppression", false))
+        setBluetoothDelayComp(settings.getInt("bt_delay_ms", 0).toFloat())
     }
 }

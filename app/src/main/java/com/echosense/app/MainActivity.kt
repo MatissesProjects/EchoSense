@@ -108,6 +108,9 @@ class MainActivity : AppCompatActivity() {
         binding.seekBarNoiseGate.progress = AudioParameterMapper.noiseGateThresholdToProgress(settingsManager.getFloat(AudioSettingsManager.KEY_NOISE_GATE, 0.0f))
         binding.seekBarWatchGain.progress = AudioParameterMapper.watchGainToProgress(settingsManager.getFloat(AudioSettingsManager.KEY_WATCH_GAIN, 2.0f))
         
+        binding.swSelfVoice.isChecked = settingsManager.prefs.getBoolean("self_voice_suppression", false)
+        binding.seekBarBtDelay.progress = settingsManager.getInt("bt_delay_ms", 0)
+
         val profile = settingsManager.getInt(AudioSettingsManager.KEY_PROFILE, 3)
         when (profile) {
             0 -> binding.chipGroupProfile.check(R.id.chipProfileVoice)
@@ -431,6 +434,20 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "AI Spatial Beamforming Active", Toast.LENGTH_SHORT).show()
             }
         }
+
+        binding.swSelfVoice.setOnCheckedChangeListener { _, isChecked ->
+            AudioEngineLib.setSelfVoiceSuppression(isChecked)
+            settingsManager.prefs.edit().putBoolean("self_voice_suppression", isChecked).apply()
+        }
+
+        binding.seekBarBtDelay.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
+                AudioEngineLib.setBluetoothDelayComp(p.toFloat())
+                settingsManager.saveInt("bt_delay_ms", p)
+            }
+            override fun onStartTrackingTouch(s: SeekBar?) {}
+            override fun onStopTrackingTouch(s: SeekBar?) {}
+        })
 
         val eqSeekBars = listOf(binding.seekBarBand1, binding.seekBarBand2, binding.seekBarBand3, binding.seekBarBand4, binding.seekBarBand5)
         eqSeekBars.forEachIndexed { index, seekBar ->

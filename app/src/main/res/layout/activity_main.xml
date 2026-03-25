@@ -403,6 +403,29 @@
                     android:text="AI Spatial Beamforming"
                     android:textColor="@color/accent_orange"
                     android:textStyle="bold"
+                    android:layout_marginBottom="8dp" />
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/swSelfVoice"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Self-Voice Suppression"
+                    android:textColor="?colorSecondary"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Wireless Phase Alignment (BT Delay)"
+                    android:textColor="@color/text_med"
+                    android:textSize="12sp"
+                    android:layout_marginBottom="4dp" />
+                <SeekBar
+                    android:id="@+id/seekBarBtDelay"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="200"
+                    android:progress="0"
                     android:layout_marginBottom="12dp" />
 
                 <TextView

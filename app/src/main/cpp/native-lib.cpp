@@ -138,6 +138,14 @@ JNIEXPORT void JNICALL JNI_METHOD(setWindReduction)(JNIEnv *env, jobject, jfloat
     if (audioEngine != nullptr) audioEngine->setWindReduction(strength);
 }
 
+JNIEXPORT void JNICALL JNI_METHOD(setSelfVoiceSuppression)(JNIEnv *env, jobject, jboolean enabled) {
+    if (audioEngine != nullptr) audioEngine->setSelfVoiceSuppression(enabled);
+}
+
+JNIEXPORT void JNICALL JNI_METHOD(setBluetoothDelayComp)(JNIEnv *env, jobject, jfloat ms) {
+    if (audioEngine != nullptr) audioEngine->setBluetoothDelayComp(ms);
+}
+
 JNIEXPORT void JNICALL JNI_METHOD(setTone)(JNIEnv *env, jobject, jfloat freq, jfloat volume) {
     if (audioEngine != nullptr) audioEngine->setTone(freq, volume);
 }
