@@ -55,6 +55,7 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("com.google.oboe:oboe:1.8.0")
     implementation("com.google.android.gms:play-services-wearable:18.1.0")
+    implementation("androidx.biometric:biometric:1.1.0")
     
     val room_version = "2.6.1"
     implementation("androidx.room:room-runtime:$room_version")
