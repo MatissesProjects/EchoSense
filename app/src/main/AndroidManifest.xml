@@ -25,6 +25,11 @@
 
         <activity android:name=".HearingTestActivity" />
 
+        <activity
+            android:name=".NotesHistoryActivity"
+            android:label="Conversation Memory"
+            android:exported="false" />
+
         <service
             android:name=".EchoSenseService"
             android:enabled="true"

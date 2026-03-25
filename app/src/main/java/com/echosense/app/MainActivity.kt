@@ -179,13 +179,13 @@ class MainActivity : AppCompatActivity() {
                 onSuccess = {
                     binding.tvTranscription.text = "AI is thinking... please wait."
                     lifecycleScope.launch {
-                        val summary = summarizationManager.getRecentNotesSummary()
-                        binding.tvTranscription.text = summary
-                        Toast.makeText(this@MainActivity, "Conversation Summarized", Toast.LENGTH_SHORT).show()
+                        val summary = summarizationManager.summarizeAndSave()
+                        binding.tvTranscription.text = "AI Summary:\n$summary"
+                        Toast.makeText(this@MainActivity, "Conversation Summarized & Saved", Toast.LENGTH_SHORT).show()
                     }
                 },
                 onError = { err ->
-                    Toast.makeText(this, "Authentication required to access history: $err", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Authentication required: $err", Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -201,6 +201,17 @@ class MainActivity : AppCompatActivity() {
                 },
                 onError = { err ->
                     Toast.makeText(this, "Authentication required to clear history", Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
+
+        binding.btnViewMemory.setOnClickListener {
+            com.echosense.app.utils.BiometricHelper.showBiometricPrompt(this,
+                onSuccess = {
+                    startActivity(Intent(this, NotesHistoryActivity::class.java))
+                },
+                onError = { err ->
+                    Toast.makeText(this, "Authentication required to view memory: $err", Toast.LENGTH_SHORT).show()
                 }
             )
         }

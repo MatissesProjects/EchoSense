@@ -26,6 +26,16 @@
                 android:textSize="28sp"
                 android:textStyle="bold"
                 android:textColor="?colorOnBackground" />
+            
+            <Button
+                android:id="@+id/btnViewMemory"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Memory"
+                android:textColor="?colorPrimary"
+                android:layout_marginEnd="8dp" />
+
             <Button
                 android:id="@+id/btnExitApp"
                 style="@style/Widget.MaterialComponents.Button.TextButton"
