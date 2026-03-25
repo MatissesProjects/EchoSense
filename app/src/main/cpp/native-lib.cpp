@@ -134,6 +134,14 @@ JNIEXPORT void JNICALL JNI_METHOD(setTransientSuppression)(JNIEnv *env, jobject,
     if (audioEngine != nullptr) audioEngine->setTransientSuppression(strength);
 }
 
+JNIEXPORT void JNICALL JNI_METHOD(setWindReduction)(JNIEnv *env, jobject, jfloat strength) {
+    if (audioEngine != nullptr) audioEngine->setWindReduction(strength);
+}
+
+JNIEXPORT void JNICALL JNI_METHOD(setTone)(JNIEnv *env, jobject, jfloat freq, jfloat volume) {
+    if (audioEngine != nullptr) audioEngine->setTone(freq, volume);
+}
+
 JNIEXPORT void JNICALL JNI_METHOD(setEqualizerBandGain)(JNIEnv *env, jobject, jint bandIndex, jfloat gain) {
     if (audioEngine != nullptr) audioEngine->setEqualizerBandGain(bandIndex, gain);
 }

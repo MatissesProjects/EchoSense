@@ -37,6 +37,8 @@ object AudioEngineLib {
     external fun setTargetSpeaker(speakerId: Int)
     external fun setMbCompression(ratio: Float)
     external fun setBeamforming(enabled: Boolean)
+    external fun setWindReduction(strength: Float)
+    external fun setTone(freq: Float, volume: Float)
     external fun setEqualizerBandGain(bandIndex: Int, gain: Float)
     external fun getVolumeLevel(): Float
     external fun getIsolationGainDb(): Float
