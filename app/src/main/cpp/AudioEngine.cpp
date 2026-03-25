@@ -146,6 +146,7 @@ void AudioEngine::setTargetSpeaker(int speakerId) { mTargetSpeakerId.store(speak
 void AudioEngine::setMbCompression(float ratio) { mMbCompressionRatio.store(ratio); }
 void AudioEngine::setBeamforming(bool enabled) { mBeamformingEnabled.store(enabled); }
 void AudioEngine::setTransientSuppression(float strength) { mTransientSuppressionStrength.store(strength); }
+void AudioEngine::setWindReduction(float strength) { mWindReductionStrength.store(strength); }
 
 void AudioEngine::learnNoise() {
     for (int i = 0; i < FFT_SIZE; i++) mNoiseProfile[i] = 0.0f;
@@ -315,6 +316,18 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
     }
 
     // 4. Biquad Cascade
+    // --- Dynamic Wind Noise Reduction ---
+    float windStrength = mWindReductionStrength.load();
+    if (windStrength > 0.01f && fusion) {
+        float ratio = phoneRMS / (watchRMS + 1e-6f);
+        // If one mic is much louder than the other, it's likely local wind rumble
+        if (ratio > 5.0f || ratio < 0.2f) {
+            float baseHpf = mHpfFreq.load();
+            float windHpf = baseHpf + windStrength * 400.0f; // Shift up to 400Hz more
+            mHighPass.setHighPass(windHpf, mSampleRate, 0.707f);
+        }
+    }
+
     mHighPass.processBlock(outputBuffer, numFrames);
     mLowPass.processBlock(outputBuffer, numFrames);
     mVoiceFilters[0].processBlock(outputBuffer, numFrames);
