@@ -147,6 +147,10 @@ void AudioEngine::setMbCompression(float ratio) { mMbCompressionRatio.store(rati
 void AudioEngine::setBeamforming(bool enabled) { mBeamformingEnabled.store(enabled); }
 void AudioEngine::setTransientSuppression(float strength) { mTransientSuppressionStrength.store(strength); }
 void AudioEngine::setWindReduction(float strength) { mWindReductionStrength.store(strength); }
+void AudioEngine::setTone(float freq, float volume) {
+    mToneFreq.store(freq);
+    mToneVolume.store(volume);
+}
 
 void AudioEngine::learnNoise() {
     for (int i = 0; i < FFT_SIZE; i++) mNoiseProfile[i] = 0.0f;
@@ -357,6 +361,17 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
         // Fallback to hard clipping if limiter not initialized
         for (int i = 0; i < numFrames; i++) {
             outputBuffer[i] = std::clamp(outputBuffer[i], -limit, limit);
+        }
+    }
+
+    // --- Pure Tone Generation (Audiometry) ---
+    float toneVol = mToneVolume.load();
+    if (toneVol > 0.0001f) {
+        float freq = mToneFreq.load();
+        float phaseInc = 2.0f * (float)M_PI * freq / mSampleRate;
+        for (int j = 0; j < numFrames; j++) {
+            outputBuffer[j] += sinf(mTonePhase) * toneVol;
+            mTonePhase = fmodf(mTonePhase + phaseInc, 2.0f * (float)M_PI);
         }
     }
 

@@ -146,6 +146,7 @@ public:
     void setBeamforming(bool enabled);
     void setTransientSuppression(float strength);
     void setWindReduction(float strength);
+    void setTone(float freq, float volume);
     void learnNoise();
     float getVolumeLevel() const { return mCurrentVolume.load(); }
     struct SpeakerInfo {
@@ -211,6 +212,9 @@ private:
     std::atomic<float> mMbCompressionRatio{1.0f};
     std::atomic<float> mFocusLevel{0.0f};
     std::atomic<float> mWindReductionStrength{0.0f};
+    std::atomic<float> mToneFreq{0.0f};
+    std::atomic<float> mToneVolume{0.0f};
+    float mTonePhase = 0.0f;
     std::atomic<float> mCurrentVolume{0.0f};
     std::atomic<float> mPhoneEnergy{0.0f};
     std::atomic<float> mWatchEnergy{0.0f};
