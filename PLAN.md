@@ -82,12 +82,24 @@ EchoSense is an Android-first application designed to act as an intelligent, con
 * [x] **Gemini Nano (AICore) Summarization:** Use the Pixel 9's on-device LLM to summarize conversation notes stored in the Room DB.
 
 ### Phase 7: Advanced Adaptive & Neural Filtering
-* [ ] **Adaptive LMS Noise Cancellation:** Use the Watch/Remote mic as a noise reference to dynamically cancel ambient sounds from the Phone mic in real-time.
-* [ ] **Spectral De-Reverberation:** Suppress late reflections in echoey environments to dry out and clarify speech.
-* [ ] **Harmonic-Percussive Source Separation (HPSS):** Separate steady voices from sharp percussive noises (typing, clicks) for aggressive transient ducking.
-* [ ] **Frequency Compression/Shifting:** Move high-frequency vocal details into lower audible ranges for users with high-frequency hearing loss.
-* [ ] **Multi-Band Neural Masking:** Use a specialized RNN/GRU gain mask to clean speech from non-stationary noise.
-* [ ] **Psychoacoustic Bass Enhancement:** Generate harmonic overtones to improve perceived low-end on small speakers/earbuds.
+* [x] **Adaptive LMS Noise Cancellation:** Use the Watch/Remote mic as a noise reference to dynamically cancel ambient sounds.
+* [x] **Spectral De-Reverberation:** Suppress late reflections in echoey environments.
+* [x] **Harmonic-Percussive Source Separation (HPSS):** Separate steady voices from sharp percussive noises.
+* [x] **Frequency Compression/Shifting:** Move high-frequency vocal details into lower audible ranges.
+* [x] **Multi-Band Neural Masking:** Use specialized gain masks to clean speech.
+* [x] **Psychoacoustic Bass Enhancement:** Generate harmonic overtones for improved low-end.
+* [x] **Acoustic Shock Protection:** Implement a look-ahead brick-wall limiter for user safety.
+* [x] **Acoustic Feedback Cancellation (AFC):** Implement adaptive filters to prevent howling loops.
+* [x] **Wind Noise Reduction:** Detect and suppress uncorrelated low-frequency wind rumble.
+
+### Phase 8: Clinical Personalization & Accessibility
+* [x] **In-App Pure-Tone Audiometry:** Build a hearing test flow for calibration.
+* [x] **Algorithmic Curve Generation:** Automatically generate EQ profiles using the Half-Gain Rule.
+* [x] **Android Accessibility Service:** Persistent floating button for quick profile toggles.
+* [x] **System Audio Focus & Ducking:** Seamless integration with calls and notifications.
+* [x] **Biometric Privacy Lock:** Protect conversation history with fingerprint/face scan.
+* [ ] **WearOS "Burst" Mode:** Implement on-demand directional capture to save watch battery.
+* [ ] **Comb Filtering Mitigation:** Phase-align delayed Bluetooth audio with passive leakage.
 
 ## 6. Known Risks & Mitigations
 1.  **Audio Stream Collisions:** Android limits how many apps/services can access the mic simultaneously. Mitigated by carefully managing the `AudioRecord` lifecycle and building a robust internal audio mixer.
