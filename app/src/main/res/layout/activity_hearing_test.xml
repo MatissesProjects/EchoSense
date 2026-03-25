@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="32dp"
+    android:gravity="center">
+
+    <TextView
+        android:id="@+id/testTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Hearing Test"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:id="@+id/testInstructions"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="We will play a series of tones. Press the button as soon as you can hear the sound."
+        android:gravity="center"
+        android:layout_marginBottom="48dp" />
+
+    <TextView
+        android:id="@+id/frequencyText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Current Frequency: 1000 Hz"
+        android:textSize="18sp"
+        android:layout_marginBottom="24dp" />
+
+    <ProgressBar
+        android:id="@+id/testProgress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="6"
+        android:progress="0"
+        android:layout_marginBottom="48dp" />
+
+    <Button
+        android:id="@+id/btnHear"
+        android:layout_width="200dp"
+        android:layout_height="200dp"
+        android:text="I HEAR IT"
+        android:textSize="20sp"
+        android:background="@drawable/circle_button"
+        android:textColor="#FFFFFF" />
+
+    <Button
+        android:id="@+id/btnStart"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="START TEST"
+        android:layout_marginTop="32dp" />
+
+</LinearLayout>
