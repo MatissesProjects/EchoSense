@@ -108,14 +108,14 @@ void testSpectralProcessor() {
     float noiseProfile[128] = {0}; 
     
     // Test 1: Transparency (Zero reduction)
-    sp.processBlock(data.data(), noiseProfile, 0.0f, 0.0f);
+    sp.processBlock(data.data(), noiseProfile, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
     for(int i=0; i<size; i++) {
         assert(std::abs(data[i] - original[i]) < 0.01f);
     }
     
     // Test 2: Reduction
     for(int i=0; i<size; i++) noiseProfile[i] = 1.0f; // High noise profile
-    sp.processBlock(data.data(), noiseProfile, 1.0f, 0.0f);
+    sp.processBlock(data.data(), noiseProfile, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
     
     float energyOriginal = 0, energyReduced = 0;
     for(int i=0; i<size; i++) {
@@ -152,19 +152,13 @@ void testVoiceIsolationBenchmark() {
 
     // 4. Run Processing (Simulation)
     SpectralProcessor sp(FFT_SIZE);
-    float noiseProfile[FFT_SIZE];
+    float noiseProfile[FFT_SIZE] = {0};
     
-    // "Learn" the noise first
-    std::vector<std::complex<float>> block(FFT_SIZE);
-    for(int j=0; j<FFT_SIZE; j++) block[j] = std::complex<float>(noise[j], 0.0f);
-    sp.fft(block, false);
-    for(int j=0; j<FFT_SIZE; j++) noiseProfile[j] = std::abs(block[j]);
-
     // Apply Spectral Subtraction and MB-Dynamics
     std::vector<float> output = mixed;
     for (int i = 0; i < size; i += FFT_SIZE) {
         if (i + FFT_SIZE <= size) {
-            sp.processBlock(output.data() + i, noiseProfile, 0.8f, 0.02f);
+            sp.processBlock(output.data() + i, noiseProfile, 0.8f, 0.02f, 0.0f, 0.0f, 0.0f, 0.0f);
         }
     }
 
