@@ -3,9 +3,10 @@ package com.echosense.app
 import android.content.Context
 import android.content.SharedPreferences
 
-class AudioSettingsManager(context: Context) {
-    val prefs: SharedPreferences = context.getSharedPreferences("audio_settings", Context.MODE_PRIVATE)
-
+class AudioSettingsManager(
+    context: Context?,
+    val prefs: SharedPreferences = context!!.getSharedPreferences("audio_settings", Context.MODE_PRIVATE)
+) {
     companion object {
         const val KEY_PRE_AMP = "pre_amp"
         const val KEY_VOICE_BOOST = "voice_boost"

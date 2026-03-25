@@ -1,24 +1,19 @@
 package com.echosense.app
 
-import android.content.Context
-import androidx.test.core.app.ApplicationProvider
+import com.echosense.app.fakes.FakeSharedPreferences
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 
-@RunWith(RobolectricTestRunner::class)
-@Config(sdk = [33])
 class AudioSettingsManagerTest {
 
     private lateinit var settingsManager: AudioSettingsManager
+    private lateinit var fakePrefs: FakeSharedPreferences
 
     @Before
     fun setup() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        settingsManager = AudioSettingsManager(context)
+        fakePrefs = FakeSharedPreferences()
+        settingsManager = AudioSettingsManager(null, fakePrefs)
     }
 
     @Test
