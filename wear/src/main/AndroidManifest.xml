@@ -25,6 +25,10 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".FiltersActivity"
+            android:exported="false" />
+
         <service
             android:name=".WearSensorService"
             android:enabled="true"

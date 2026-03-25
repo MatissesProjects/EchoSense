@@ -13,6 +13,7 @@ import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import com.echosense.app.utils.AudioConverter
+import com.echosense.app.utils.AudioParameterMapper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,14 +35,39 @@ class EchoSenseService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private val messageListener = MessageClient.OnMessageReceivedListener { messageEvent ->
-        if (messageEvent.path == SET_TARGET_SPEAKER_PATH) {
-            val speakerId = String(messageEvent.data).toIntOrNull() ?: -1
-            AudioEngineLib.setTargetSpeaker(speakerId)
-            Log.d(TAG, "Target speaker set from Wear: $speakerId")
-            
-            // Update settings too so UI reflects it
-            val settings = AudioSettingsManager(this)
-            settings.saveInt(AudioSettingsManager.KEY_TARGET_SPEAKER, speakerId)
+        val data = String(messageEvent.data)
+        val settings = AudioSettingsManager(this)
+        
+        when (messageEvent.path) {
+            SET_TARGET_SPEAKER_PATH -> {
+                val speakerId = data.toIntOrNull() ?: -1
+                AudioEngineLib.setTargetSpeaker(speakerId)
+                settings.saveInt(AudioSettingsManager.KEY_TARGET_SPEAKER, speakerId)
+            }
+            "/set_watch_gain" -> {
+                val p = data.toIntOrNull() ?: 40
+                val gain = AudioParameterMapper.progressToWatchGain(p)
+                AudioEngineLib.setRemoteGain(gain)
+                settings.saveFloat(AudioSettingsManager.KEY_WATCH_GAIN, gain)
+            }
+            "/set_dereverb" -> {
+                val p = data.toIntOrNull() ?: 0
+                val strength = AudioParameterMapper.progressToDereverb(p)
+                AudioEngineLib.setDereverbStrength(strength)
+                settings.saveFloat("dereverb_strength", strength)
+            }
+            "/set_neural_mask" -> {
+                val p = data.toIntOrNull() ?: 0
+                val strength = AudioParameterMapper.progressToNeuralMask(p)
+                AudioEngineLib.setNeuralMaskStrength(strength)
+                settings.saveFloat("neural_mask_strength", strength)
+            }
+            "/set_hpss" -> {
+                val p = data.toIntOrNull() ?: 0
+                val strength = AudioParameterMapper.progressToHpss(p)
+                AudioEngineLib.setHpssStrength(strength)
+                settings.saveFloat("hpss_strength", strength)
+            }
         }
     }
 

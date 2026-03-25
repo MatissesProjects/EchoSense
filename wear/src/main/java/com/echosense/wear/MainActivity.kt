@@ -68,6 +68,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        findViewById<Button>(R.id.btnRemoteFilters).setOnClickListener {
+            startActivity(Intent(this, FiltersActivity::class.java))
+        }
+
         Wearable.getMessageClient(this).addListener(messageListener)
 
         // Initial UI state

@@ -78,6 +78,26 @@ JNIEXPORT void JNICALL JNI_METHOD(setSpectralGateThreshold)(JNIEnv *env, jobject
     if (audioEngine != nullptr) audioEngine->setSpectralGateThreshold(threshold);
 }
 
+JNIEXPORT void JNICALL JNI_METHOD(setDereverbStrength)(JNIEnv *env, jobject, jfloat strength) {
+    if (audioEngine != nullptr) audioEngine->setDereverbStrength(strength);
+}
+
+JNIEXPORT void JNICALL JNI_METHOD(setHpssStrength)(JNIEnv *env, jobject, jfloat strength) {
+    if (audioEngine != nullptr) audioEngine->setHpssStrength(strength);
+}
+
+JNIEXPORT void JNICALL JNI_METHOD(setFreqWarpStrength)(JNIEnv *env, jobject, jfloat strength) {
+    if (audioEngine != nullptr) audioEngine->setFreqWarpStrength(strength);
+}
+
+JNIEXPORT void JNICALL JNI_METHOD(setNeuralMaskStrength)(JNIEnv *env, jobject, jfloat strength) {
+    if (audioEngine != nullptr) audioEngine->setNeuralMaskStrength(strength);
+}
+
+JNIEXPORT void JNICALL JNI_METHOD(setBassBoostStrength)(JNIEnv *env, jobject, jfloat strength) {
+    if (audioEngine != nullptr) audioEngine->setBassBoostStrength(strength);
+}
+
 JNIEXPORT void JNICALL JNI_METHOD(learnNoise)(JNIEnv *env, jobject) {
     if (audioEngine != nullptr) audioEngine->learnNoise();
 }
