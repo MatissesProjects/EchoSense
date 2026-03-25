@@ -8,27 +8,27 @@ import android.view.View
 class FrequencyVisualizerView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
 
     private val spectrumPaint = Paint().apply {
-        color = Color.parseColor("#444CAF50") // Light Green
+        color = Color.parseColor("#4400E5FF") // Transparent Neon Cyan
         style = Paint.Style.FILL
         isAntiAlias = true
     }
 
     private val curvePaint = Paint().apply {
-        color = Color.parseColor("#FFC107") // Amber
+        color = Color.parseColor("#1DE9B6") // Neon Teal
         style = Paint.Style.STROKE
-        strokeWidth = 4f
+        strokeWidth = 5f
         isAntiAlias = true
     }
 
     private val gridPaint = Paint().apply {
-        color = Color.parseColor("#33FFFFFF")
+        color = Color.parseColor("#1AFFFFFF") // Very subtle white grid
         style = Paint.Style.STROKE
-        strokeWidth = 1f
+        strokeWidth = 2f
     }
 
     private val isolationPaint = Paint().apply {
-        color = Color.parseColor("#B2FF59") // Volt Green
-        textSize = 32f
+        color = Color.parseColor("#FF9800") // Vibrant Orange
+        textSize = 36f
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         isAntiAlias = true
     }

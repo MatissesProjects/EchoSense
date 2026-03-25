@@ -1,59 +1,100 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="32dp"
+    android:background="?android:colorBackground"
+    android:padding="24dp"
     android:gravity="center">
 
-    <TextView
-        android:id="@+id/testTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Hearing Test"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="16dp" />
-
-    <TextView
-        android:id="@+id/testInstructions"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="We will play a series of tones. Press the button as soon as you can hear the sound."
-        android:gravity="center"
-        android:layout_marginBottom="48dp" />
-
-    <TextView
-        android:id="@+id/frequencyText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Current Frequency: 1000 Hz"
-        android:textSize="18sp"
-        android:layout_marginBottom="24dp" />
-
-    <ProgressBar
-        android:id="@+id/testProgress"
-        style="?android:attr/progressBarStyleHorizontal"
+    <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:max="6"
-        android:progress="0"
-        android:layout_marginBottom="48dp" />
+        app:cardBackgroundColor="@color/card_bg"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="0dp">
+        
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="32dp"
+            android:gravity="center">
 
-    <Button
-        android:id="@+id/btnHear"
-        android:layout_width="200dp"
-        android:layout_height="200dp"
-        android:text="I HEAR IT"
-        android:textSize="20sp"
-        android:background="@drawable/circle_button"
-        android:textColor="#FFFFFF" />
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@android:drawable/ic_lock_silent_mode_off"
+                app:tint="?colorPrimary"
+                android:layout_marginBottom="16dp"/>
 
-    <Button
-        android:id="@+id/btnStart"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="START TEST"
-        android:layout_marginTop="32dp" />
+            <TextView
+                android:id="@+id/testTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Pure-Tone Audiometry"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="?colorOnBackground"
+                android:layout_marginBottom="16dp" />
+
+            <TextView
+                android:id="@+id/testInstructions"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="We will play a series of tones at varying frequencies. Tap the button as soon as you can hear the sound."
+                android:textColor="@color/text_med"
+                android:gravity="center"
+                android:layout_marginBottom="32dp" />
+
+            <TextView
+                android:id="@+id/frequencyText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Current Frequency: --"
+                android:textColor="?colorPrimary"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="24dp" />
+
+            <ProgressBar
+                android:id="@+id/testProgress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="8dp"
+                android:max="6"
+                android:progress="0"
+                android:progressTint="?colorPrimary"
+                android:layout_marginBottom="48dp" />
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+                
+                <Button
+                    android:id="@+id/btnHear"
+                    android:layout_width="160dp"
+                    android:layout_height="160dp"
+                    android:layout_gravity="center"
+                    android:text="I HEAR IT"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:background="@drawable/circle_button"
+                    android:textColor="#000000" />
+
+                <Button
+                    android:id="@+id/btnStart"
+                    android:layout_width="match_parent"
+                    android:layout_height="64dp"
+                    android:layout_gravity="center"
+                    android:text="BEGIN CALIBRATION"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="32dp" />
+            </FrameLayout>
+            
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
 
 </LinearLayout>
