@@ -169,6 +169,11 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "AI Adaptive Tuning Applied", Toast.LENGTH_SHORT).show()
         }
 
+        binding.btnHearingTest.setOnClickListener {
+            val intent = Intent(this, HearingTestActivity::class.java)
+            startActivity(intent)
+        }
+
         binding.btnSummarize.setOnClickListener {
             binding.tvTranscription.text = "AI is thinking... please wait."
             lifecycleScope.launch {

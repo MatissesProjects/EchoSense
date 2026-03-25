@@ -54,7 +54,16 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="AI Auto-Tune"
-                android:backgroundTint="#FF9800" />
+                android:backgroundTint="#FF9800"
+                android:layout_marginEnd="4dp" />
+
+            <Button
+                android:id="@+id/btnHearingTest"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Hearing Test"
+                android:backgroundTint="#4CAF50" />
         </LinearLayout>
 
         <com.google.android.material.switchmaterial.SwitchMaterial
