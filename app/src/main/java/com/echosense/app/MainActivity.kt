@@ -175,20 +175,34 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnSummarize.setOnClickListener {
-            binding.tvTranscription.text = "AI is thinking... please wait."
-            lifecycleScope.launch {
-                val summary = summarizationManager.getRecentNotesSummary()
-                binding.tvTranscription.text = summary
-                Toast.makeText(this@MainActivity, "Conversation Summarized", Toast.LENGTH_SHORT).show()
-            }
+            com.echosense.app.utils.BiometricHelper.showBiometricPrompt(this, 
+                onSuccess = {
+                    binding.tvTranscription.text = "AI is thinking... please wait."
+                    lifecycleScope.launch {
+                        val summary = summarizationManager.getRecentNotesSummary()
+                        binding.tvTranscription.text = summary
+                        Toast.makeText(this@MainActivity, "Conversation Summarized", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onError = { err ->
+                    Toast.makeText(this, "Authentication required to access history: $err", Toast.LENGTH_SHORT).show()
+                }
+            )
         }
 
         binding.btnClearHistory.setOnClickListener {
-            lifecycleScope.launch {
-                summarizationManager.clearHistory()
-                binding.tvTranscription.text = "History Cleared."
-                Toast.makeText(this@MainActivity, "Database Cleared", Toast.LENGTH_SHORT).show()
-            }
+            com.echosense.app.utils.BiometricHelper.showBiometricPrompt(this, 
+                onSuccess = {
+                    lifecycleScope.launch {
+                        summarizationManager.clearHistory()
+                        binding.tvTranscription.text = "History Cleared."
+                        Toast.makeText(this@MainActivity, "Database Cleared", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onError = { err ->
+                    Toast.makeText(this, "Authentication required to clear history", Toast.LENGTH_SHORT).show()
+                }
+            )
         }
 
         binding.swTargetLock.setOnCheckedChangeListener { _, isChecked ->
