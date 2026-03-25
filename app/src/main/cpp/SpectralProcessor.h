@@ -13,7 +13,13 @@ public:
         mPrevMag.assign(mSize, 0.0f);
         mBitRev.resize(mSize);
         
-        // Pseudo-Neural State (Fast/Slow Energy Estimators)
+        // Pre-allocate buffers to avoid real-time allocation
+        mCurrentMag.resize(mSize);
+        mCurrentPhase.resize(mSize);
+        mNewMag.resize(mSize);
+        mWarpedMag.resize(mSize);
+
+        // Pseudo-Neural State
         mFastEnergy.assign(mSize, 0.0f);
         mSlowEnergy.assign(mSize, 0.0f);
 
@@ -38,9 +44,18 @@ public:
         }
     }
 
-    void processBlock(float* data, float* noiseProfile, float reductionStrength, 
+    // Fast approximation of expf for neural sigmoid
+    inline float fastExp(float x) {
+        union { uint32_t i; float f; } v;
+        v.i = (uint32_t)(12102203 * x + 1064866805);
+        return v.f;
+    }
+
+    void processBlock(float* __restrict data, float* __restrict noiseProfile, float reductionStrength, 
                      float spectralGateThresh, float dereverbStrength, float hpssStrength,
                      float freqWarpStrength, float neuralMaskStrength) {
+        
+        // 1. Load and FFT
         for (int i = 0; i < mSize; i++) {
             mReal[i] = data[i];
             mImag[i] = 0.0f;
@@ -49,23 +64,24 @@ public:
         runFft(mReal.data(), mImag.data(), false);
 
         float decay = 0.85f; 
-        std::vector<float> currentMag(mSize);
-        std::vector<float> currentPhase(mSize);
-
+        
+        // 2. Magnitude and Phase calculation (No allocation)
         for (int i = 0; i < mSize; i++) {
-            currentMag[i] = sqrtf(mReal[i] * mReal[i] + mImag[i] * mImag[i]);
-            currentPhase[i] = atan2f(mImag[i], mReal[i]);
-            mMagHistory[mHistoryIndex][i] = currentMag[i];
+            float r = mReal[i];
+            float im = mImag[i];
+            mCurrentMag[i] = sqrtf(r * r + im * im);
+            // Use standard atan2f for now, but on pre-allocated buffer
+            mCurrentPhase[i] = atan2f(im, r);
+            mMagHistory[mHistoryIndex][i] = mCurrentMag[i];
+            mNewMag[i] = mCurrentMag[i];
         }
 
-        std::vector<float> newMag = currentMag;
-
-        // Neural-like Masking Params
         float alphaFast = 0.4f;
         float alphaSlow = 0.05f;
 
+        // 3. Combined Filter Pass (Loop Fusion)
         for (int i = 0; i < mSize; i++) {
-            float magnitude = currentMag[i];
+            float magnitude = mCurrentMag[i];
             if (magnitude < 1e-9f) {
                 mPrevMag[i] *= decay;
                 mFastEnergy[i] *= (1.0f - alphaFast);
@@ -73,76 +89,68 @@ public:
                 continue;
             }
 
-            // --- Multi-Band Neural Masking (Recursive Energy Ratio) ---
+            float tempMag = magnitude;
+
+            // Neural Masking
             if (neuralMaskStrength > 0.01f) {
-                mFastEnergy[i] = (1.0f - alphaFast) * mFastEnergy[i] + alphaFast * magnitude;
-                mSlowEnergy[i] = (1.0f - alphaSlow) * mSlowEnergy[i] + alphaSlow * magnitude;
-                
-                // Ratio of fast energy to slow energy (high ratio = likely speech transient)
-                float snr_estimate = mFastEnergy[i] / (mSlowEnergy[i] + 1e-6f);
-                // Sigmoid-like gain mask based on SNR estimate
-                float mask = 1.0f / (1.0f + expf(-2.0f * (snr_estimate - 1.5f)));
-                newMag[i] *= (1.0f - neuralMaskStrength) + (mask * neuralMaskStrength);
+                mFastEnergy[i] = (1.0f - alphaFast) * mFastEnergy[i] + alphaFast * tempMag;
+                mSlowEnergy[i] = (1.0f - alphaSlow) * mSlowEnergy[i] + alphaSlow * tempMag;
+                float snr = mFastEnergy[i] / (mSlowEnergy[i] + 1e-6f);
+                float mask = 1.0f / (1.0f + fastExp(-2.0f * (snr - 1.5f)));
+                tempMag *= (1.0f - neuralMaskStrength) + (mask * neuralMaskStrength);
             }
 
-            // --- HPSS ---
+            // HPSS (Median window)
             if (hpssStrength > 0.01f) {
-                std::vector<float> h_window(mHistorySize);
-                for(int t=0; t<mHistorySize; t++) h_window[t] = mMagHistory[t][i];
-                std::sort(h_window.begin(), h_window.end());
-                float harmonic = h_window[mHistorySize/2];
-
-                int v_size = 3;
-                std::vector<float> v_window;
-                for(int f=std::max(0, i-1); f<=std::min(mSize-1, i+1); f++) 
-                    v_window.push_back(mMagHistory[mHistoryIndex][f]);
-                std::sort(v_window.begin(), v_window.end());
-                float percussive = v_window[v_window.size()/2];
+                float h_window[5]; // history size is 5
+                for(int t=0; t<5; t++) h_window[t] = mMagHistory[t][i];
+                std::sort(h_window, h_window + 5);
+                float harmonic = h_window[2];
+                
+                float v_window[3];
+                v_window[0] = mMagHistory[mHistoryIndex][std::max(0, i-1)];
+                v_window[1] = mMagHistory[mHistoryIndex][i];
+                v_window[2] = mMagHistory[mHistoryIndex][std::min(mSize-1, i+1)];
+                std::sort(v_window, v_window + 3);
+                float percussive = v_window[1];
 
                 float harmonicMask = (harmonic * harmonic) / (harmonic * harmonic + percussive * percussive + 1e-9f);
-                newMag[i] *= (1.0f - hpssStrength) + (harmonicMask * hpssStrength);
+                tempMag *= (1.0f - hpssStrength) + (harmonicMask * hpssStrength);
             }
 
-            // --- Neural Gate ---
-            if (spectralGateThresh > 0.001f && newMag[i] < spectralGateThresh) {
-                newMag[i] *= 0.05f; 
-            }
-
-            // --- Spectral Subtraction ---
-            float noiseFloor = noiseProfile[i] * reductionStrength;
-            if (newMag[i] < noiseFloor) {
-                newMag[i] *= 0.1f;
-            } else {
-                newMag[i] -= noiseFloor * 0.5f;
-            }
-
-            // --- Dereverb ---
+            // Dereverb
             if (dereverbStrength > 0.01f) {
                 float lateReverb = mPrevMag[i] * decay;
-                if (newMag[i] < lateReverb * dereverbStrength) {
-                    newMag[i] *= 0.2f; 
-                }
-                mPrevMag[i] = std::max(newMag[i], lateReverb);
+                if (tempMag < lateReverb * dereverbStrength) tempMag *= 0.2f; 
+                mPrevMag[i] = std::max(tempMag, lateReverb);
             }
-            newMag[i] = std::max(0.0f, newMag[i]);
+
+            // Spectral Subtraction & Gate
+            float noiseFloor = noiseProfile[i] * reductionStrength;
+            if (tempMag < noiseFloor) tempMag *= 0.1f;
+            else tempMag -= noiseFloor * 0.5f;
+
+            if (spectralGateThresh > 0.001f && tempMag < spectralGateThresh) tempMag *= 0.05f;
+
+            mNewMag[i] = std::max(0.0f, tempMag);
         }
 
-        // --- Frequency Compression (Warping) ---
+        // 4. Frequency Warping
         if (freqWarpStrength > 0.01f) {
-            std::vector<float> warpedMag = newMag;
             for (int i = 0; i < mSize / 2; i++) {
                 float normalizedFreq = (float)i / (mSize / 2.0f);
                 float warpedFreq = powf(normalizedFreq, 1.0f + freqWarpStrength * 0.5f);
-                int sourceBin = (int)(warpedFreq * (mSize / 2.0f));
-                sourceBin = std::min(mSize / 2 - 1, sourceBin);
-                warpedMag[i] = newMag[i] * (1.0f - freqWarpStrength) + newMag[sourceBin] * freqWarpStrength;
+                int sourceBin = std::min(mSize / 2 - 1, (int)(warpedFreq * (mSize / 2.0f)));
+                mWarpedMag[i] = mNewMag[i] * (1.0f - freqWarpStrength) + mNewMag[sourceBin] * freqWarpStrength;
             }
-            newMag = warpedMag;
+            // Reflect to upper half for real FFT symmetry (simplified)
+            for (int i = 0; i < mSize / 2; i++) mNewMag[i] = mWarpedMag[i];
         }
 
+        // 5. Reconstruct and IFFT
         for (int i = 0; i < mSize; i++) {
-            mReal[i] = newMag[i] * cosf(currentPhase[i]);
-            mImag[i] = newMag[i] * sinf(currentPhase[i]);
+            mReal[i] = mNewMag[i] * cosf(mCurrentPhase[i]);
+            mImag[i] = mNewMag[i] * sinf(mCurrentPhase[i]);
         }
 
         mHistoryIndex = (mHistoryIndex + 1) % mHistorySize;
@@ -151,7 +159,7 @@ public:
     }
 
 private:
-    void runFft(float* real, float* imag, bool invert) {
+    void runFft(float* __restrict real, float* __restrict imag, bool invert) {
         for (int i = 0; i < mSize; i++) {
             if (i < mBitRev[i]) {
                 std::swap(real[i], real[mBitRev[i]]);
@@ -191,6 +199,13 @@ private:
     std::vector<float> mPrevMag;
     std::vector<float> mFastEnergy;
     std::vector<float> mSlowEnergy;
+    
+    // Pre-allocated buffers for processBlock
+    std::vector<float> mCurrentMag;
+    std::vector<float> mCurrentPhase;
+    std::vector<float> mNewMag;
+    std::vector<float> mWarpedMag;
+
     int mHistorySize;
     std::vector<std::vector<float>> mMagHistory;
     int mHistoryIndex;

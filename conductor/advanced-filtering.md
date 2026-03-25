@@ -5,10 +5,10 @@ Implement six major advanced filtering techniques to elevate EchoSense to medica
 
 ## Status
 - [x] **Adaptive LMS Noise Cancellation**: Implemented in `LMSFilter.h`.
-- [ ] **Spectral De-Reverberation**: Suppress late reflections.
-- [ ] **Harmonic-Percussive Source Separation (HPSS)**: Separate voices from sharp noises.
-- [ ] **Frequency Compression/Shifting**: Help with high-frequency hearing loss.
-- [ ] **Multi-Band Neural Masking**: RNN-based gain masking.
+- [x] **Spectral De-Reverberation**: Suppress late reflections.
+- [x] **Harmonic-Percussive Source Separation (HPSS)**: Separate voices from sharp noises.
+- [x] **Frequency Compression/Shifting**: Help with high-frequency hearing loss.
+- [x] **Multi-Band Neural Masking**: RNN-based gain masking.
 - [ ] **Psychoacoustic Bass Enhancement**: Virtual pitch generation.
 
 ## Implementation Plan

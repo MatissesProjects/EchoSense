@@ -195,8 +195,18 @@ void AudioEngine::updateFilters() {
     mParamsChanged.store(false);
 }
 
+inline float AudioEngine::processSample(float sample) {
+    // Scalar fallback/refinement
+    float out = mHighPass.process(sample);
+    out = mLowPass.process(out);
+    out = mVoiceFilters[0].process(out);
+    out = mVoiceFilters[1].process(out);
+    for (int i = 0; i < 5; ++i) out = mEQBands[i].process(out);
+    return out;
+}
+
 oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
-    float *outputBuffer = static_cast<float *>(audioData);
+    float * __restrict outputBuffer = static_cast<float *>(audioData);
     if (mParamsChanged.load()) updateFilters();
 
     float phoneRMS = 0.0f;
