@@ -10,9 +10,16 @@
 #define TAG "AudioEngine"
 
 AudioEngine::AudioEngine() : mLmsFilter(128, 0.01f), mFeedbackCanceller(512, 0.005f) {
+    float smoothCoeff = 0.0005f; // Very smooth
+    mPreAmpGain.setSmoothing(smoothCoeff);
+    mVoiceBoostDb.setSmoothing(smoothCoeff);
+    mMasterGain.setSmoothing(smoothCoeff);
+
     for (int i = 0; i < 5; ++i) {
-        mManualBandGains[i].store(0.0f);
-        mProfileBandGains[i].store(0.0f);
+        mManualBandGains[i].reset(0.0f);
+        mProfileBandGains[i].reset(0.0f);
+        mManualBandGains[i].setSmoothing(smoothCoeff);
+        mProfileBandGains[i].setSmoothing(smoothCoeff);
     }
     mSpectralProcessor = new SpectralProcessor(FFT_SIZE);
     mSceneClassifier = new SceneClassifier(FFT_SIZE, mSampleRate);
@@ -91,8 +98,8 @@ void AudioEngine::writeRemoteAudio(const float* data, int32_t numFrames) {
     }
 }
 
-void AudioEngine::setPreAmpGain(float gain) { mPreAmpGain.store(gain); }
-void AudioEngine::setVoiceBoost(float gainDb) { mVoiceBoostDb.store(gainDb); mParamsChanged.store(true); }
+void AudioEngine::setPreAmpGain(float gain) { mPreAmpGain.setTarget(gain); }
+void AudioEngine::setVoiceBoost(float gainDb) { mVoiceBoostDb.setTarget(gainDb); mParamsChanged.store(true); }
 void AudioEngine::setHpfFreq(float freq) { mHpfFreq.store(freq); mParamsChanged.store(true); }
 void AudioEngine::setLpfFreq(float freq) { mLpfFreq.store(freq); mParamsChanged.store(true); }
 void AudioEngine::setLimiterThreshold(float threshold) { mLimiterThreshold.store(threshold); }
@@ -104,40 +111,40 @@ void AudioEngine::setHpssStrength(float strength) { mHpssStrength.store(strength
 void AudioEngine::setFreqWarpStrength(float strength) { mFreqWarpStrength.store(strength); }
 void AudioEngine::setNeuralMaskStrength(float strength) { mNeuralMaskStrength.store(strength); }
 void AudioEngine::setBassBoostStrength(float strength) { mBassBoostStrength.store(strength); mParamsChanged.store(true); }
-void AudioEngine::setMasterGain(float gain) { mMasterGain.store(gain); }
+void AudioEngine::setMasterGain(float gain) { mMasterGain.setTarget(gain); }
 
 void AudioEngine::setEqualizerBandGain(int bandIndex, float gainDb) {
     if (bandIndex >= 0 && bandIndex < 5) {
-        mManualBandGains[bandIndex].store(gainDb);
+        mManualBandGains[bandIndex].setTarget(gainDb);
         mParamsChanged.store(true);
     }
 }
 
 void AudioEngine::setProfile(AudioProfile profile) {
     mAudioProfile.store(profile);
-    for (int i = 0; i < 5; ++i) mProfileBandGains[i].store(0.0f);
-    mVoiceBoostDb.store(0.0f);
+    for (int i = 0; i < 5; ++i) mProfileBandGains[i].setTarget(0.0f);
+    mVoiceBoostDb.setTarget(0.0f);
 
     if (profile == AudioProfile::Voice) {
-        mProfileBandGains[0].store(-12.0f);
-        mProfileBandGains[1].store(-6.0f);
-        mProfileBandGains[2].store(3.0f);
-        mProfileBandGains[3].store(8.0f);
-        mProfileBandGains[4].store(-3.0f);
-        mVoiceBoostDb.store(10.0f);
+        mProfileBandGains[0].setTarget(-12.0f);
+        mProfileBandGains[1].setTarget(-6.0f);
+        mProfileBandGains[2].setTarget(3.0f);
+        mProfileBandGains[3].setTarget(8.0f);
+        mProfileBandGains[4].setTarget(-3.0f);
+        mVoiceBoostDb.setTarget(10.0f);
     } else if (profile == AudioProfile::Music) {
-        mProfileBandGains[0].store(4.0f);
-        mProfileBandGains[1].store(0.0f);
-        mProfileBandGains[2].store(-2.0f);
-        mProfileBandGains[3].store(2.0f);
-        mProfileBandGains[4].store(4.0f);
+        mProfileBandGains[0].setTarget(4.0f);
+        mProfileBandGains[1].setTarget(0.0f);
+        mProfileBandGains[2].setTarget(-2.0f);
+        mProfileBandGains[3].setTarget(2.0f);
+        mProfileBandGains[4].setTarget(4.0f);
     } else if (profile == AudioProfile::TV) {
-        mProfileBandGains[0].store(-6.0f);
-        mProfileBandGains[1].store(0.0f);
-        mProfileBandGains[2].store(4.0f);
-        mProfileBandGains[3].store(6.0f);
-        mProfileBandGains[4].store(-4.0f);
-        mVoiceBoostDb.store(6.0f);
+        mProfileBandGains[0].setTarget(-6.0f);
+        mProfileBandGains[1].setTarget(0.0f);
+        mProfileBandGains[2].setTarget(4.0f);
+        mProfileBandGains[3].setTarget(6.0f);
+        mProfileBandGains[4].setTarget(-4.0f);
+        mVoiceBoostDb.setTarget(6.0f);
     }
     mParamsChanged.store(true);
 }
@@ -195,11 +202,11 @@ void AudioEngine::updateFilters() {
         mLowPass.setLowPass(mLpfFreq.load(), mSampleRate, 0.707f);
         float freqs[5] = {200.0f, 500.0f, 1500.0f, 3000.0f, 6000.0f};
         for (int i = 0; i < 5; ++i) {
-            float combinedGain = mManualBandGains[i].load() + mProfileBandGains[i].load();
+            float combinedGain = mManualBandGains[i].getCurrent() + mProfileBandGains[i].getCurrent();
             mEQBands[i].setPeaking(freqs[i], mSampleRate, 1.0f, combinedGain);
         }
-        mVoiceFilters[0].setPeaking(700.0f, mSampleRate, 0.4f, mVoiceBoostDb.load() * 0.4f);
-        mVoiceFilters[1].setPeaking(3200.0f, mSampleRate, 0.4f, mVoiceBoostDb.load() * 0.8f);
+        mVoiceFilters[0].setPeaking(700.0f, mSampleRate, 0.4f, mVoiceBoostDb.getCurrent() * 0.4f);
+        mVoiceFilters[1].setPeaking(3200.0f, mSampleRate, 0.4f, mVoiceBoostDb.getCurrent() * 0.8f);
     }
     
     // Virtual Bass Filters
@@ -290,7 +297,7 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
     }
 
     // 2. Pre-Processing Gain Fusion
-    float combinedGain = mPreAmpGain.load() * mMasterGain.load();
+    float combinedGain = mPreAmpGain.next() * mMasterGain.next();
     
     int targetId = mTargetSpeakerId.load();
     if (targetId != -1) {
@@ -300,10 +307,18 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
         else combinedGain *= 0.5f;
     }
 
-    if (mCurrentRampGain < 1.0f) {
-        combinedGain *= mCurrentRampGain;
-        mCurrentRampGain += mRampStep * numFrames;
+    if (mIsRunning.load()) {
+        if (mCurrentRampGain < 1.0f) {
+            mCurrentRampGain += mRampStep * numFrames;
+            if (mCurrentRampGain > 1.0f) mCurrentRampGain = 1.0f;
+        }
+    } else {
+        if (mCurrentRampGain > 0.0f) {
+            mCurrentRampGain -= mRampStep * numFrames;
+            if (mCurrentRampGain < 0.0f) mCurrentRampGain = 0.0f;
+        }
     }
+    combinedGain *= mCurrentRampGain;
 
     int i = 0;
 #if defined(__ARM_NEON)
@@ -437,12 +452,12 @@ void AudioEngine::getEqCurveData(float* output, int size) {
 }
 
 void AudioEngine::autoTune() {
-    mManualBandGains[0].store(-18.0f);
-    mManualBandGains[1].store(-8.0f);
-    mManualBandGains[2].store(4.0f);
-    mManualBandGains[3].store(12.0f);
-    mManualBandGains[4].store(-6.0f);
-    mVoiceBoostDb.store(15.0f);
+    mManualBandGains[0].setTarget(-18.0f);
+    mManualBandGains[1].setTarget(-8.0f);
+    mManualBandGains[2].setTarget(4.0f);
+    mManualBandGains[3].setTarget(12.0f);
+    mManualBandGains[4].setTarget(-6.0f);
+    mVoiceBoostDb.setTarget(15.0f);
     mParamsChanged.store(true);
 }
 

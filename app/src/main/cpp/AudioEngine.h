@@ -109,6 +109,30 @@ struct Biquad {
     }
 };
 
+// Simple Exponential Smoothing for parameters
+class SmoothedValue {
+public:
+    SmoothedValue(float initial = 0.0f) : mCurrent(initial), mTarget(initial) {}
+    
+    void setTarget(float target) { mTarget.store(target); }
+    float getTarget() const { return mTarget.load(); }
+    
+    inline float next() {
+        float t = mTarget.load();
+        mCurrent = mCurrent + mCoeff * (t - mCurrent);
+        return mCurrent;
+    }
+
+    float getCurrent() const { return mCurrent; }
+    void reset(float value) { mCurrent = value; mTarget.store(value); }
+    void setSmoothing(float coeff) { mCoeff = coeff; }
+
+private:
+    float mCurrent;
+    std::atomic<float> mTarget;
+    float mCoeff = 0.001f; // Default smoothing
+};
+
 class AudioEngine : public oboe::AudioStreamDataCallback {
 public:
     AudioEngine();
@@ -193,8 +217,8 @@ private:
 
     float getNextResampledRemoteSample();
 
-    std::atomic<float> mPreAmpGain{1.0f};
-    std::atomic<float> mVoiceBoostDb{0.0f};
+    SmoothedValue mPreAmpGain{1.0f};
+    SmoothedValue mVoiceBoostDb{0.0f};
     std::atomic<float> mHpfFreq{150.0f};
     std::atomic<float> mLpfFreq{12000.0f};
     std::atomic<float> mLimiterThreshold{0.9f};
@@ -206,9 +230,9 @@ private:
     std::atomic<float> mFreqWarpStrength{0.0f};
     std::atomic<float> mNeuralMaskStrength{0.0f};
     std::atomic<float> mBassBoostStrength{0.0f};
-    std::atomic<float> mManualBandGains[5];
-    std::atomic<float> mProfileBandGains[5];
-    std::atomic<float> mMasterGain{1.0f};
+    SmoothedValue mManualBandGains[5];
+    SmoothedValue mProfileBandGains[5];
+    SmoothedValue mMasterGain{1.0f};
     std::atomic<AudioProfile> mAudioProfile{AudioProfile::Custom};
     std::atomic<bool> mSensorFusionEnabled{false};
     std::atomic<bool> mTargetLockEnabled{false};
