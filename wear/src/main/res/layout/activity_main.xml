@@ -41,15 +41,30 @@
             android:id="@+id/btnToggleWatchMic"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Start Watch Mic"
-            android:textSize="12sp" />
+            android:text="Switch Focus"
+            android:textSize="10sp" />
+
+        <Button
+            android:id="@+id/btnStartBurst"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Burst (30s)"
+            android:textSize="10sp"
+            android:backgroundTint="#FF9800" />
+
+        <Button
+            android:id="@+id/btnToggleWatchStream"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Start Stream"
+            android:textSize="10sp" />
 
         <Button
             android:id="@+id/btnRemoteFilters"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Remote Filters"
-            android:textSize="12sp"
+            android:textSize="10sp"
             android:backgroundTint="#673AB7" />
 
     </LinearLayout>

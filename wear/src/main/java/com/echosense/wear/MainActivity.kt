@@ -1,14 +1,18 @@
 package com.echosense.wear
 
+import android.Manifest
 import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import androidx.wear.widget.WearableLinearLayoutManager
 import com.google.android.gms.wearable.MessageClient
@@ -28,6 +32,11 @@ class MainActivity : AppCompatActivity() {
     private val SPEAKER_INFO_PATH = "/speaker_info"
     private val SET_TARGET_SPEAKER_PATH = "/set_target_speaker"
     private val TOGGLE_MIC_PATH = "/toggle_mic_source"
+    private val START_STREAMING_PATH = "/start_streaming"
+    private val STOP_STREAMING_PATH = "/stop_streaming"
+    private val START_BURST_PATH = "/start_burst"
+
+    private var isStreaming = false
 
     private val messageListener = MessageClient.OnMessageReceivedListener { messageEvent ->
         when (messageEvent.path) {
@@ -38,6 +47,10 @@ class MainActivity : AppCompatActivity() {
             "/status_update" -> {
                 val data = String(messageEvent.data)
                 tvStatus.text = data
+                if (data == "Burst Ended") {
+                    findViewById<Button>(R.id.btnToggleWatchStream).text = "Start Streaming"
+                    isStreaming = false
+                }
             }
         }
     }
@@ -46,10 +59,13 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        val btnFocus = findViewById<Button>(R.id.btnToggleWatchMic) // Reusing ID for Focus toggle
+        val btnFocus = findViewById<Button>(R.id.btnToggleWatchMic)
+        val btnStream = findViewById<Button>(R.id.btnToggleWatchStream)
+        val btnBurst = findViewById<Button>(R.id.btnStartBurst)
         tvStatus = findViewById<TextView>(R.id.tvWatchStatus)
 
-        btnFocus.text = "Switch Mic Focus"
+        btnFocus.text = "Switch Focus"
+        btnStream.text = "Start Stream"
         tvStatus.text = "Remote Syncing..."
 
         findViewById<RecyclerView>(R.id.recyclerSpeakers).apply {
@@ -59,6 +75,36 @@ class MainActivity : AppCompatActivity() {
 
         btnFocus.setOnClickListener {
             sendCommand(TOGGLE_MIC_PATH, "toggle")
+        }
+
+        btnBurst.setOnClickListener {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 101)
+                return@setOnClickListener
+            }
+            sendCommand(START_BURST_PATH, "start_burst")
+            btnStream.text = "Stop Stream"
+            isStreaming = true
+            tvStatus.text = "Burst (30s) Active"
+        }
+
+        btnStream.setOnClickListener {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 101)
+                return@setOnClickListener
+            }
+
+            if (!isStreaming) {
+                sendCommand(START_STREAMING_PATH, "start")
+                btnStream.text = "Stop Streaming"
+                isStreaming = true
+                tvStatus.text = "Streaming Active"
+            } else {
+                sendCommand(STOP_STREAMING_PATH, "stop")
+                btnStream.text = "Start Streaming"
+                isStreaming = false
+                tvStatus.text = "Streaming Stopped"
+            }
         }
 
         findViewById<Button>(R.id.btnRemoteFilters).setOnClickListener {
