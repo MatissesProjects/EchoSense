@@ -40,6 +40,8 @@ object AudioEngineLib {
     external fun setWindReduction(strength: Float)
     external fun setSelfVoiceSuppression(enabled: Boolean)
     external fun setBluetoothDelayComp(ms: Float)
+    external fun setAutoSceneDetection(enabled: Boolean)
+    external fun getDetectedScene(): Int
     external fun setTone(freq: Float, volume: Float)
     external fun setEqualizerBandGain(bandIndex: Int, gain: Float)
     external fun getVolumeLevel(): Float
@@ -106,5 +108,6 @@ object AudioEngineLib {
         
         setSelfVoiceSuppression(settings.prefs.getBoolean("self_voice_suppression", false))
         setBluetoothDelayComp(settings.getInt("bt_delay_ms", 0).toFloat())
+        setAutoSceneDetection(settings.prefs.getBoolean("auto_scene_detection", false))
     }
 }

@@ -15,11 +15,13 @@ AudioEngine::AudioEngine() : mLmsFilter(128, 0.01f), mFeedbackCanceller(512, 0.0
         mProfileBandGains[i].store(0.0f);
     }
     mSpectralProcessor = new SpectralProcessor(FFT_SIZE);
+    mSceneClassifier = new SceneClassifier(FFT_SIZE, mSampleRate);
 }
 
 AudioEngine::~AudioEngine() {
     stop();
     delete mSpectralProcessor;
+    delete mSceneClassifier;
     delete mLimiter;
 }
 
@@ -149,6 +151,7 @@ void AudioEngine::setTransientSuppression(float strength) { mTransientSuppressio
 void AudioEngine::setWindReduction(float strength) { mWindReductionStrength.store(strength); }
 void AudioEngine::setSelfVoiceSuppression(bool enabled) { mSelfVoiceSuppressionEnabled.store(enabled); }
 void AudioEngine::setBluetoothDelayComp(float ms) { mBluetoothDelayCompMs.store(ms); }
+void AudioEngine::setAutoSceneDetection(bool enabled) { mAutoSceneDetectionEnabled.store(enabled); }
 void AudioEngine::setTone(float freq, float volume) {
     mToneFreq.store(freq);
     mToneVolume.store(volume);
@@ -319,10 +322,29 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
     float hpss = mHpssStrength.load();
     float warp = mFreqWarpStrength.load();
     float neural = mNeuralMaskStrength.load();
-    if (reduction > 0.01f || specGate > 0.001f || dereverb > 0.01f || hpss > 0.01f || warp > 0.01f || neural > 0.01f) {
+    if (reduction > 0.01f || specGate > 0.001f || dereverb > 0.01f || hpss > 0.01f || warp > 0.01f || neural > 0.01f || mAutoSceneDetectionEnabled.load()) {
         for (int j = 0; j < numFrames; j += FFT_SIZE) {
             if (j + FFT_SIZE <= numFrames) {
                 mSpectralProcessor->processBlock(outputBuffer + j, mNoiseProfile, reduction, specGate, dereverb, hpss, warp, neural);
+                
+                // Adaptive Scene Detection
+                mSceneFrameCounter++;
+                if (mSceneFrameCounter >= 100) { // Every ~250ms at FFT_SIZE=128
+                    mSceneFrameCounter = 0;
+                    SceneType newScene = mSceneClassifier->classify(mSpectralProcessor->getCurrentMagnitude(), FFT_SIZE);
+                    SceneType currentDetected = mDetectedScene.load();
+                    
+                    if (newScene != currentDetected) {
+                        mDetectedScene.store(newScene);
+                        if (mAutoSceneDetectionEnabled.load()) {
+                            // Map SceneType to AudioProfile
+                            if (newScene == SceneType::Music) setProfile(AudioProfile::Music);
+                            else if (newScene == SceneType::Voice) setProfile(AudioProfile::Voice);
+                            else if (newScene == SceneType::Quiet) setProfile(AudioProfile::Custom); // Keep current or low gain
+                            else if (newScene == SceneType::Noisy) setTargetLock(true); // Auto-engage isolation
+                        }
+                    }
+                }
             }
         }
     }

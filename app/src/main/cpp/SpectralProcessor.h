@@ -158,6 +158,8 @@ public:
         for (int i = 0; i < mSize; i++) data[i] = mReal[i];
     }
 
+    const float* getCurrentMagnitude() const { return mCurrentMag.data(); }
+
 private:
     void runFft(float* __restrict real, float* __restrict imag, bool invert) {
         for (int i = 0; i < mSize; i++) {

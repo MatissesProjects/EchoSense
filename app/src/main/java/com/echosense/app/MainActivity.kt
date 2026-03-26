@@ -110,6 +110,7 @@ class MainActivity : AppCompatActivity() {
         
         binding.swSelfVoice.isChecked = settingsManager.prefs.getBoolean("self_voice_suppression", false)
         binding.seekBarBtDelay.progress = settingsManager.getInt("bt_delay_ms", 0)
+        binding.swAutoScene.isChecked = settingsManager.prefs.getBoolean("auto_scene_detection", false)
 
         val profile = settingsManager.getInt(AudioSettingsManager.KEY_PROFILE, 3)
         when (profile) {
@@ -440,6 +441,16 @@ class MainActivity : AppCompatActivity() {
             settingsManager.prefs.edit().putBoolean("self_voice_suppression", isChecked).apply()
         }
 
+        binding.swAutoScene.setOnCheckedChangeListener { _, isChecked ->
+            AudioEngineLib.setAutoSceneDetection(isChecked)
+            settingsManager.prefs.edit().putBoolean("auto_scene_detection", isChecked).apply()
+            if (isChecked) {
+                Toast.makeText(this, "AI Scene Detection Active", Toast.LENGTH_SHORT).show()
+            } else {
+                binding.tvDetectedScene.text = "Detected Scene: Off"
+            }
+        }
+
         binding.seekBarBtDelay.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) { 
                 AudioEngineLib.setBluetoothDelayComp(p.toFloat())
@@ -673,6 +684,18 @@ class MainActivity : AppCompatActivity() {
                     // Refresh speakers every ~300ms
                     if (counter % 10 == 0) {
                         refreshSpeakerList()
+                        
+                        if (settingsManager.prefs.getBoolean("auto_scene_detection", false)) {
+                            val sceneId = AudioEngineLib.getDetectedScene()
+                            val sceneName = when(sceneId) {
+                                0 -> "Quiet"
+                                1 -> "Voice Focus"
+                                2 -> "Music"
+                                3 -> "Crowded/Noisy"
+                                else -> "Searching..."
+                            }
+                            binding.tvDetectedScene.text = "AI Scene: $sceneName"
+                        }
                     }
                     counter++
                 }

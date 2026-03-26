@@ -7,6 +7,7 @@
 #include <vector>
 #include <mutex>
 #include "SpectralProcessor.h"
+#include "SceneClassifier.h"
 #include "LMSFilter.h"
 #include "Limiter.h"
 
@@ -149,6 +150,8 @@ public:
     void setTone(float freq, float volume);
     void setSelfVoiceSuppression(bool enabled);
     void setBluetoothDelayComp(float ms);
+    void setAutoSceneDetection(bool enabled);
+    int getDetectedScene() const { return (int)mDetectedScene.load(); }
     void learnNoise();
     float getVolumeLevel() const { return mCurrentVolume.load(); }
     struct SpeakerInfo {
@@ -255,6 +258,10 @@ private:
 
     // Spectral AI
     SpectralProcessor* mSpectralProcessor = nullptr;
+    SceneClassifier* mSceneClassifier = nullptr;
+    std::atomic<bool> mAutoSceneDetectionEnabled{false};
+    std::atomic<SceneType> mDetectedScene{SceneType::Quiet};
+    int mSceneFrameCounter = 0;
     float mNoiseProfile[FFT_SIZE] = {0};
     std::atomic<bool> mLearningNoise{false};
     int mLearningCounter = 0;

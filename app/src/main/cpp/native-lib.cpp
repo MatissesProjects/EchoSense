@@ -146,6 +146,15 @@ JNIEXPORT void JNICALL JNI_METHOD(setBluetoothDelayComp)(JNIEnv *env, jobject, j
     if (audioEngine != nullptr) audioEngine->setBluetoothDelayComp(ms);
 }
 
+JNIEXPORT void JNICALL JNI_METHOD(setAutoSceneDetection)(JNIEnv *env, jobject, jboolean enabled) {
+    if (audioEngine != nullptr) audioEngine->setAutoSceneDetection(enabled);
+}
+
+JNIEXPORT jint JNICALL JNI_METHOD(getDetectedScene)(JNIEnv *env, jobject) {
+    if (audioEngine != nullptr) return audioEngine->getDetectedScene();
+    return 0;
+}
+
 JNIEXPORT void JNICALL JNI_METHOD(setTone)(JNIEnv *env, jobject, jfloat freq, jfloat volume) {
     if (audioEngine != nullptr) audioEngine->setTone(freq, volume);
 }
