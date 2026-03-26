@@ -51,7 +51,7 @@ EchoSense is an Android-first application designed to act as an intelligent, con
 ### Phase 2: Multi-Mic Array & WearOS Link
 * [x] Implement `AudioManager` routing to allow switching between the Phone Mic and the Headset Mic via the UI.
 * [x] Develop WearOS companion app.
-* [ ] **WearOS Data Stability:** Resolve `ChannelClient` streaming issues (Currently tabled).
+* [x] **WearOS Data Stability:** Implemented 16kHz PCM streaming via ChannelClient with foreground service support.
 * [x] Implement DSP Serial Routing, Profiles (Voice/Music/TV), and Noise Gate Hysteresis.
 * [x] **Persistent Customization:** Implement Manual EQ offsets that persist across profile changes.
 * [x] **Target Lock (Crowd Mode):** Implement hyper-restrictive bandpass filtering to isolate human speech fundamentals in extreme noise.
@@ -62,7 +62,7 @@ EchoSense is an Android-first application designed to act as an intelligent, con
 ### Phase 3: Intelligence & Transcription
 * [x] Integrate on-device Speech-to-Text.
 * [x] Feed the filtered DSP audio into the transcription engine.
-* [ ] Implement Google AICore (Gemini Nano) to summarize the resulting text.
+* [x] Implement Google AICore (Gemini Nano) to summarize the resulting text.
 
 ### Phase 4: Stabilization & Memory
 * [ ] **Sensor Fusion Stabilization:** Debug and fix WearOS 16kHz->48kHz resampling and streaming data flow.
@@ -71,8 +71,8 @@ EchoSense is an Android-first application designed to act as an intelligent, con
 * [ ] *The Wireless Test:* Introduce the Pixel Buds Pro 2 and attempt to apply the Phase 1 DSP code to the Bluetooth LE Audio stream, optimizing buffer sizes to mitigate the newly introduced latency.
 
 ### Phase 5: Intelligent Scene Awareness
-* [ ] **Adaptive Scene Detection:** Automatically switch to "Music/Quiet" when ambient noise is detected and "Voice" when speech harmonics are identified.
-* [ ] **Priority-Based Profiles:** Implement a hierarchy (Speech > Ambient > Music) for automated profile transitions.
+* [x] **Adaptive Scene Detection:** Automatically switch to "Music/Quiet" when ambient noise is detected and "Voice" when speech harmonics are identified.
+* [x] **Priority-Based Profiles:** Implement a hierarchy (Speech > Ambient > Music) for automated profile transitions.
 * [ ] **Environmental Fingerprinting:** Use FFT data to create and recognize unique acoustic signatures of different spaces.
 
 ### Phase 6: Spectral AI & Advanced DSP
@@ -98,8 +98,8 @@ EchoSense is an Android-first application designed to act as an intelligent, con
 * [x] **Android Accessibility Service:** Persistent floating button for quick profile toggles.
 * [x] **System Audio Focus & Ducking:** Seamless integration with calls and notifications.
 * [x] **Biometric Privacy Lock:** Protect conversation history with fingerprint/face scan.
-* [ ] **WearOS "Burst" Mode:** Implement on-demand directional capture to save watch battery.
-* [ ] **Comb Filtering Mitigation:** Phase-align delayed Bluetooth audio with passive leakage.
+* [x] **WearOS "Burst" Mode:** Implement on-demand directional capture to save watch battery.
+* [x] **Comb Filtering Mitigation:** Phase-align delayed Bluetooth audio with passive leakage.
 
 ## 6. Known Risks & Mitigations
 1.  **Audio Stream Collisions:** Android limits how many apps/services can access the mic simultaneously. Mitigated by carefully managing the `AudioRecord` lifecycle and building a robust internal audio mixer.
