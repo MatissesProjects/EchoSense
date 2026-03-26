@@ -24,14 +24,14 @@ class SummarizationManagerTest {
             daoOverride = fakeDao
         )
         
-        val summary = summarizationManager.getRecentNotesSummary()
+        val summary = summarizationManager.summarizeAndSave()
         
         assertTrue(summary.contains("No conversation history"))
     }
 
     @Test
     fun testSummaryWithNotesSuccess() = runBlocking {
-        fakeDao.insertNote(ConversationNote(text = "Hello", timestamp = 1000))
+        fakeDao.insertNote(ConversationNote(text = "Hello", timestamp = 1000, speakerLabel = "Speaker A"))
         
         summarizationManager = SummarizationManager(
             context = null,
@@ -39,16 +39,14 @@ class SummarizationManagerTest {
             summarizer = { "This is a fake summary" }
         )
         
-        val summary = summarizationManager.getRecentNotesSummary()
+        val summary = summarizationManager.summarizeAndSave()
         
-        assertTrue(summary.contains("--- AI CONTEXT SUMMARY ---"))
         assertTrue(summary.contains("This is a fake summary"))
-        assertTrue(summary.contains("Hello"))
     }
 
     @Test
     fun testSummaryWithNotesFailure() = runBlocking {
-        fakeDao.insertNote(ConversationNote(text = "Hello", timestamp = 1000))
+        fakeDao.insertNote(ConversationNote(text = "Hello", timestamp = 1000, speakerLabel = "Speaker A"))
         
         summarizationManager = SummarizationManager(
             context = null,
@@ -56,10 +54,9 @@ class SummarizationManagerTest {
             summarizer = { throw RuntimeException("Fake API Error") }
         )
         
-        val summary = summarizationManager.getRecentNotesSummary()
+        val summary = summarizationManager.summarizeAndSave()
         
-        assertTrue(summary.contains("--- CONVERSATION LOG ---"))
-        assertTrue(summary.contains("AI Summarization unavailable"))
-        assertTrue(summary.contains("Hello"))
+        assertTrue(summary.contains("Summary unavailable"))
+        assertTrue(summary.contains("Fake API Error"))
     }
 }

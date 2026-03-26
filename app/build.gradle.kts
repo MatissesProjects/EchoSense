@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.echosense.app"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.echosense.app"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
@@ -49,20 +49,21 @@ android {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("com.google.android.material:material:1.11.0")
+    implementation("androidx.core:core-ktx:1.18.0")
+    implementation("androidx.appcompat:appcompat:1.7.1")
+    implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
-    implementation("com.google.oboe:oboe:1.8.0")
-    implementation("com.google.android.gms:play-services-wearable:18.1.0")
+    implementation("com.google.oboe:oboe:1.9.3")
+    implementation("com.google.android.gms:play-services-wearable:19.0.0")
     implementation("androidx.biometric:biometric:1.1.0")
-    
-    val room_version = "2.6.1"
+
+    val room_version = "2.8.4"
     implementation("androidx.room:room-runtime:$room_version")
     implementation("androidx.room:room-ktx:$room_version")
     ksp("androidx.room:room-compiler:$room_version")
 
     implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
+
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.11.1")
