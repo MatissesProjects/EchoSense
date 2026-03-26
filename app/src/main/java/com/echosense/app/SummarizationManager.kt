@@ -21,7 +21,14 @@ class SummarizationManager(
         ?: db?.conversationNoteDao() 
         ?: EchoSenseDatabase.getDatabase(context!!).conversationNoteDao()
 
-    private val model: GenerativeModel by lazy {
+    private val nanoModel: GenerativeModel by lazy {
+        GenerativeModel(
+            modelName = "gemini-nano",
+            apiKey = "" // Not required for on-device Nano via AICore
+        )
+    }
+
+    private val cloudModel: GenerativeModel by lazy {
         generativeModel ?: GenerativeModel(
             modelName = "gemini-1.5-flash",
             apiKey = "TODO_USER_API_KEY"
@@ -42,20 +49,24 @@ class SummarizationManager(
             "${it.speakerLabel} [$time]: ${it.text}"
         }
 
+        val prompt = "Summarize this conversation into 1-2 bullet points of key intent:\n\n$conversationText"
+
         val summary = try {
             if (summarizer != null) {
                 summarizer.invoke(conversationText)
             } else {
-                // In a real app with Gemini Nano, we'd use the AICore/Vertex SDK for on-device inference.
-                // For this prototype, we'll provide a high-quality "Simulated AI" response 
-                // if no API key is provided, or use the model if it is.
-                if (model.apiKey == "TODO_USER_API_KEY") {
-                    simulateAISummary(recentNotes)
-                } else {
-                    val response = model.generateContent(content {
-                        text("Summarize this conversation into 1-2 bullet points of key intent:\n\n$conversationText")
-                    })
-                    response.text ?: "AI could not generate a summary."
+                // Try On-Device Gemini Nano first
+                try {
+                    val response = nanoModel.generateContent(prompt)
+                    response.text ?: throw Exception("Nano returned empty text")
+                } catch (nanoEx: Exception) {
+                    // Fallback to Cloud or Simulation
+                    if (cloudModel.apiKey == "TODO_USER_API_KEY") {
+                        simulateAISummary(recentNotes)
+                    } else {
+                        val response = cloudModel.generateContent(prompt)
+                        response.text ?: "AI could not generate a summary."
+                    }
                 }
             }
         } catch (e: Exception) {

@@ -62,7 +62,7 @@ dependencies {
     implementation("androidx.room:room-ktx:$room_version")
     ksp("androidx.room:room-compiler:$room_version")
 
-    implementation("com.google.ai.client.generativeai:generativeai:0.2.0")
+    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.11.1")
