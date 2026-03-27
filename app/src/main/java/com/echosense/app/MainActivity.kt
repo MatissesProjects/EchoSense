@@ -30,11 +30,19 @@ import java.util.Locale
 
 import com.echosense.app.utils.AudioParameterMapper
 
+import androidx.activity.compose.setContent
+import androidx.lifecycle.ViewModelProvider
+import com.echosense.app.ui.DashboardViewModel
+import com.echosense.app.ui.DashboardViewModelFactory
+import com.echosense.app.ui.EchoSenseTheme
+import com.echosense.app.ui.screens.DashboardScreen
+
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var settingsManager: AudioSettingsManager
     private lateinit var summarizationManager: SummarizationManager
+    private lateinit var dashboardViewModel: DashboardViewModel
     private val PERMISSION_REQUEST_CODE = 1
     
     private val fftData = FloatArray(64)
@@ -48,13 +56,29 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        
+        // Initialize managers
         settingsManager = AudioSettingsManager(this)
         summarizationManager = SummarizationManager(this)
+        
+        // Initialize Compose ViewModel
+        val factory = DashboardViewModelFactory(settingsManager)
+        dashboardViewModel = ViewModelProvider(this, factory)[DashboardViewModel::class.java]
 
-        setupUI()
-        restoreUiFromSettings()
+        // For transition period, we keep binding for non-migrated parts if needed
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        
+        setContent {
+            EchoSenseTheme {
+                DashboardScreen(
+                    viewModel = dashboardViewModel,
+                    onNavigateToHistory = {
+                        startActivity(Intent(this, NotesHistoryActivity::class.java))
+                    }
+                )
+            }
+        }
+
         setupSpeechRecognizer()
         checkPermissions()
     }
