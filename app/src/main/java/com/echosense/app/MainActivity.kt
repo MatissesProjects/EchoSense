@@ -33,7 +33,7 @@ import com.echosense.app.utils.AudioParameterMapper
 import androidx.activity.compose.setContent
 import androidx.lifecycle.ViewModelProvider
 import com.echosense.app.ui.DashboardViewModel
-import com.echosense.app.ui.DashboardViewModelFactory
+import com.echosense.app.ui.EchoSenseViewModelFactory
 import com.echosense.app.ui.EchoSenseTheme
 import com.echosense.app.ui.screens.DashboardScreen
 

@@ -21,6 +21,27 @@ class DashboardViewModel(private val settingsManager: AudioSettingsManager) : Vi
     private val _noiseGate = MutableStateFlow(settingsManager.getFloat(AudioSettingsManager.KEY_NOISE_GATE, -60.0f))
     val noiseGate: StateFlow<Float> = _noiseGate.asStateFlow()
 
+    private val _isEngineRunning = MutableStateFlow(AudioEngineLib.isAudioEngineRunning())
+    val isEngineRunning: StateFlow<Boolean> = _isEngineRunning.asStateFlow()
+
+    private val _detectedScene = MutableStateFlow("Searching...")
+    val detectedScene: StateFlow<String> = _detectedScene.asStateFlow()
+
+    private val _volumeLevel = MutableStateFlow(0f)
+    val volumeLevel: StateFlow<Float> = _volumeLevel.asStateFlow()
+
+    fun updateEngineStatus(isRunning: Boolean) {
+        _isEngineRunning.value = isRunning
+    }
+
+    fun updateDetectedScene(scene: String) {
+        _detectedScene.value = scene
+    }
+
+    fun updateVolume(level: Float) {
+        _volumeLevel.value = level
+    }
+
     fun updatePreAmp(value: Float) {
         _preAmpGain.value = value
         settingsManager.saveFloat(AudioSettingsManager.KEY_PRE_AMP, value)
